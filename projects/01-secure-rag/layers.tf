@@ -1,13 +1,14 @@
 # Trigger installation of libraries
 resource "null_resource" "build_lambda_layer" {
   triggers = {
-    requirements_hash = filemd5("${path.module}/../../infrastructure/modules/lambda_layers/faiss_layer/requirements.txt")
+    # Reference the file in the SAME directory as layers.tf
+    requirements_hash = filemd5("${path.module}/requirements-faiss.txt")
   }
 
   provisioner "local-exec" {
     command = <<EOT
       mkdir -p ${path.module}/python
-      pip install -r ${path.module}/../../infrastructure/modules/lambda_layers/faiss_layer/requirements.txt -t ${path.module}/python/ --platform manylinux2014_x86_64 --only-binary=:all:
+      pip install -r ${path.module}/requirements-faiss.txt -t ${path.module}/python/ --platform manylinux2014_x86_64 --only-binary=:all:
     EOT
   }
 }
