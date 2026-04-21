@@ -14,7 +14,7 @@ resource aws_iam_role "rag_lambda_role" {
 }
 
 resource "aws_iam_role_policy" "bedrock_access" {
-    role = aws_iam_role.rag_lamda_role.id
+    role = aws_iam_role.rag_lambda_role.id
 
     policy = jsonencode({
     Version = "2012-10-17"
