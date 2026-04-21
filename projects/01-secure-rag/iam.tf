@@ -13,6 +13,24 @@ resource aws_iam_role "rag_lambda_role" {
   })
 }
 
+resource "aws_iam_role_policy" "s3_vector_access" {
+  role = aws_iam_role.rag_lambda_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
+        Effect   = "Allow"
+        Resource = [
+          "${aws_s3_bucket.vector_store_bucket.arn}",
+          "${aws_s3_bucket.vector_store_bucket.arn}/*",
+          "${aws_s3_bucket.data_landing_zone.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
 resource "aws_iam_role_policy" "bedrock_access" {
     role = aws_iam_role.rag_lambda_role.id
 
