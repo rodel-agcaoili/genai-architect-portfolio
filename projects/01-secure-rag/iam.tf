@@ -1,9 +1,12 @@
-# IAM role for Lambda functions
+resource "random_id" "suffix" {
+  byte_length = 4
+}
 
-resource aws_iam_role "rag_lambda_role" {
-    name = "rag_lambda_role"
+resource "aws_iam_role" "rag_lambda_role" {
+  # Use 'name_prefix' instead of 'name' for even better portability
+  name_prefix = "rag-lambda-role-${random_id.suffix.hex}-"
 
-    assume_role_policy = jsonencode({
+  assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Action = "sts:AssumeRole"

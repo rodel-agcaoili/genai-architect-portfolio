@@ -24,4 +24,11 @@ else
     gh secret set AWS_SESSION_TOKEN -b"$session_token"
 fi
 
-echo "GitHub Secrets updated! Check your Actions tab."
+echo "Environment keys synced."
+echo "Triggering the 'Hydration' pipeline to rebuild your AI stack..."
+
+# This command tells GitHub Actions to start the workflow immediately
+gh workflow run "Hydrate AWS Portfolio"
+
+echo "Done. Your infrastructure is now deploying in the background."
+echo "Monitor progress here: https://github.com/$(gh repo view --json nameWithOwner -q .nameWithOwner)/actions"

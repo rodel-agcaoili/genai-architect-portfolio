@@ -19,6 +19,30 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Run Checkov
+        id: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: projects/01-secure-rag
+          framework: terraform
+          soft_fail: true 
+          quiet: true # Only show failures
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-pr-commenter-action@v1.2.0
+        with:
+          tfsec_args: --soft-fail
+          working_directory: projects/01-secure-rag
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download Terraform State
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: hydrate-infra.yml
+          name: terraform-state
+          if_no_artifact_found: warn
+          path: projects/01-secure-rag/
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -36,3 +60,10 @@ jobs:
           cd projects/01-secure-rag
           terraform init
           terraform apply -auto-approve
+
+      - name: Upload Terraform State
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-state
+          path: projects/01-secure-rag/terraform.tfstate
