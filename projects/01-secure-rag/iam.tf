@@ -1,6 +1,6 @@
 # IAM role for Lambda functions
 
-resource aws_iam_role "rag_lamda_role" {
+resource aws_iam_role "rag_lambda_role" {
     name = "rag_lamda_role"
 
     assume_role_policy = jsonencode({
