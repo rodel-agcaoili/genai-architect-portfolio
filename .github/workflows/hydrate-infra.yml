@@ -60,6 +60,12 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Build Lambda Layer (Local-Exec Replacement)
+        run: |
+          cd projects/01-secure-rag
+          mkdir -p layer_build/python
+          pip install -r requirements-faiss.txt -t layer_build/python/ --platform manylinux2014_x86_64 --only-binary=:all:
+
       - name: Install Build Dependencies
         run: pip install --upgrade pip
 

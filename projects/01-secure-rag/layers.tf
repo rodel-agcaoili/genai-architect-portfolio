@@ -1,18 +1,3 @@
-resource "null_resource" "build_lambda_layer" {
-  triggers = {
-    requirements_hash = filemd5("${path.module}/requirements-faiss.txt")
-  }
-
-  provisioner "local-exec" {
-    # We create a nested structure: layer_build/python
-    command = <<EOT
-      rm -rf ${path.module}/layer_build
-      mkdir -p ${path.module}/layer_build/python
-      pip install -r ${path.module}/requirements-faiss.txt -t ${path.module}/layer_build/python/ --platform manylinux2014_x86_64 --only-binary=:all:
-    EOT
-  }
-}
-
 data "archive_file" "faiss_layer_zip" {
   type        = "zip"
   source_dir  = "${path.module}/layer_build"
