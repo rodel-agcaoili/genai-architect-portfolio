@@ -46,10 +46,15 @@ resource "aws_iam_role_policy" "bedrock_access" {
           "bedrock:InvokeModelWithResponseStream"
         ]
         Effect   = "Allow"
-        Resource = [
-          "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-sonnet-*",
-          "arn:aws:bedrock:*::foundation-model/amazon.titan-embed-text-v2:0"
+        Resource = *
+      },
+      {
+        Action = [
+          "aws-marketplace:ViewSubscriptions",
+          "aws-marketplace:Subscribe"
         ]
+        Effect   = "Allow"
+        Resource = "*"
       }
     ]
   })
