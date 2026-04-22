@@ -1,12 +1,22 @@
-data "archive_file" "faiss_layer_zip" {
-  type        = "zip"
-  source_dir  = "${path.module}/layer_build"
-  output_path = "${path.module}/faiss_layer.zip"
+# Upload the ZIP to S3 instead of sending it via API
+resource "aws_s3_object" "faiss_layer_artifact" {
+  bucket = aws_s3_bucket.vector_store_bucket.id
+  key    = "artifacts/faiss_layer_${random_id.suffix.hex}.zip"
+  source = data.archive_file.faiss_layer_zip.output_path
+  
+  # Ensure the ZIP is rebuilt before uploading
+  depends_on = [data.archive_file.faiss_layer_zip]
 }
 
+# Update the Layer to point to the S3 Object
 resource "aws_lambda_layer_version" "faiss_layer" {
-  filename            = data.archive_file.faiss_layer_zip.output_path
-  layer_name          = "faiss_ai_layer-${random_id.suffix.hex}" # Added random suffix for clean redeploys
+  layer_name = "faiss_ai_layer-${random_id.suffix.hex}"
+  
+  s3_bucket = aws_s3_bucket.vector_store_bucket.id
+  s3_key    = aws_s3_object.faiss_layer_artifact.key
+  
   compatible_runtimes = ["python3.12"]
-  source_code_hash    = data.archive_file.faiss_layer_zip.output_base64sha256
+  
+  # Keeps the layer updated if the zip content changes
+  source_code_hash = data.archive_file.faiss_layer_zip.output_base64sha256
 }
