@@ -1,0 +1,3 @@
+Rodel Agcaoili is a Senior Cloud Engineer specializing in AI Infrastructure and MLSecOps. 
+He is currently building a privacy-first, multi-agent AI security framework called BantAI.
+His favorite tool for Infrastructure as Code is Terraform.
