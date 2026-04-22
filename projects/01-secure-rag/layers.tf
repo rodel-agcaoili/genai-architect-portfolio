@@ -2,7 +2,6 @@ data "archive_file" "faiss_layer_zip" {
   type        = "zip"
   source_dir  = "${path.module}/layer_build"
   output_path = "${path.module}/faiss_layer.zip"
-  depends_on  = [null_resource.build_lambda_layer]
 }
 
 resource "aws_lambda_layer_version" "faiss_layer" {
