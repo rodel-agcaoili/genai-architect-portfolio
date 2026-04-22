@@ -10,7 +10,7 @@ bedrock = boto3.client('bedrock-runtime')
 # Environment Variables
 VECTOR_BUCKET = os.environ['VECTOR_BUCKET_NAME']
 INDEX_KEY = "indices/my_vector_index.faiss"
-MODEL_ID = "anthropic.claude-3-7-sonnet-20250219-v1:0"
+MODEL_ID = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 
 
 def lambda_handler(event, context):
