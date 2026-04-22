@@ -53,9 +53,20 @@ def lambda_handler(event, context):
         modelId=MODEL_ID,
         body=json.dumps({
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 512,
-            "messages": [{"role": "user", "content": prompt}],
-            "system": system_prompt
+            "max_tokens": 1024, # Increased for Claude 4/3.7 reasoning
+            "system": system_prompt,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": prompt
+                        }
+                    ]
+                }
+            ],
+            "temperature": 0
         })
     )
     
