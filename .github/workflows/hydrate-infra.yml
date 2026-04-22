@@ -55,6 +55,12 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Clean Lambda Workspace
+        run: |
+          find . -name "*.zip" -type f -delete
+          rm -rf projects/01-secure-rag/lambda/ingestor.zip
+          rm -rf projects/01-secure-rag/lambda/query.zip
+
       - name: Setup Python for Lambda Layers
         uses: actions/setup-python@v5
         with:
