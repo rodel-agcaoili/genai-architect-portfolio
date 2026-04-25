@@ -13,20 +13,31 @@ if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
   exit 1
 fi
 
+# Update Local AWS CLI Credentials
+aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
+aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
+aws configure set region "us-east-1"
+if [ -n "$AWS_SESSION_TOKEN" ]; then
+  aws configure set aws_session_token "$AWS_SESSION_TOKEN"
+else
+  aws configure set aws_session_token ""
+fi
+echo "✅ Local ~/.aws/credentials profile heavily synced!"
+
 # Use GitHub CLI to securely set repo secrets
 gh secret set AWS_ACCESS_KEY_ID --body "$AWS_ACCESS_KEY_ID"
-echo "✅ AWS_ACCESS_KEY_ID updated."
+echo "✅ GitHub AWS_ACCESS_KEY_ID updated."
 
 gh secret set AWS_SECRET_ACCESS_KEY --body "$AWS_SECRET_ACCESS_KEY"
-echo "✅ AWS_SECRET_ACCESS_KEY updated."
+echo "✅ GitHub AWS_SECRET_ACCESS_KEY updated."
 
 if [ -n "$AWS_SESSION_TOKEN" ]; then
   gh secret set AWS_SESSION_TOKEN --body "$AWS_SESSION_TOKEN"
-  echo "✅ AWS_SESSION_TOKEN updated."
+  echo "✅ GitHub AWS_SESSION_TOKEN updated."
 else
   # If empty, delete or set empty so it doesn't break non-lab auth
   gh secret remove AWS_SESSION_TOKEN >/dev/null 2>&1 || true
-  echo "✅ AWS_SESSION_TOKEN cleared (removed)."
+  echo "✅ GitHub AWS_SESSION_TOKEN cleared (removed)."
 fi
 
 echo "Success! Your GitHub Actions pipeline now has the latest ephemeral lab credentials."
