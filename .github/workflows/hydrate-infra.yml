@@ -7,7 +7,12 @@ on:
       - 'projects/01-secure-rag/**'
       - 'infrastructure/**'
   workflow_dispatch: # Allows manual trigger from GH UI
-
+    inputs:
+      fresh_lab:
+        description: 'Fresh Lab Mode (Ignores previous Terraform State)'
+        required: false
+        type: boolean
+        default: false
 jobs:
   terraform:
     name: "Terraform Apply"
@@ -36,6 +41,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download Terraform State
+        if: ${{ !inputs.fresh_lab }}
         uses: dawidd6/action-download-artifact@v3
         with:
           workflow: hydrate-infra.yml
