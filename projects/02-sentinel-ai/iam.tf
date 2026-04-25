@@ -64,3 +64,25 @@ resource "aws_lambda_permission" "allow_bedrock_invoke" {
   principal     = "bedrock.amazonaws.com"
   source_arn    = "arn:aws:bedrock:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:agent/${aws_bedrockagent_agent.sentinel_agent.id}"
 }
+
+# -----------------------------------------------------------------------------------------
+# Dynamic Environment Hack
+# Attempt to explicitly grant cloud_user the ability to invoke the agent in ACloudGuru.
+# Note: If the AWS Organization Sandbox imposes strict SCP limits, this may still fail 
+# at the root level, but we are designing this securely at the Identity level!
+# -----------------------------------------------------------------------------------------
+resource "aws_iam_user_policy" "cloud_user_bedrock_invoke" {
+  name = "cloud_user_bedrock_invoke"
+  user = "cloud_user"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "bedrock:InvokeAgent"
+        Effect = "Allow"
+        Resource = "*"
+      }
+    ]
+  })
+}
