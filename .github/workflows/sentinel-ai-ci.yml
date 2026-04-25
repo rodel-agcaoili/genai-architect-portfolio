@@ -49,9 +49,17 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
 
+    - name: Download Terraform State
+      uses: dawidd6/action-download-artifact@v3
+      with:
+        workflow: sentinel-ai-ci.yml
+        name: sentinel-terraform-state
+        path: projects/02-sentinel-ai/
+        if_no_artifact_found: warn
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
-      
+
     - name: Clean Previous Builds
       run: |
         rm -rf projects/02-sentinel-ai/remediator.zip
@@ -61,3 +69,10 @@ jobs:
         cd projects/02-sentinel-ai
         terraform init
         terraform apply -auto-approve
+
+    - name: Upload Terraform State
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: sentinel-terraform-state
+        path: projects/02-sentinel-ai/terraform.tfstate
