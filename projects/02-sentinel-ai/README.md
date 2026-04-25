@@ -27,11 +27,30 @@ When you spin up a fresh temporary lab:
    - Once mocked tests pass, the pipeline downloads any previous Terraform state natively via GitHub Artifacts (protecting against mid-run runner crashes).
    - It executes `terraform apply -auto-approve` using the newly injected lab credentials.
 
-### Step 3: Test Functionality
-1. In the AWS Console, head to **Amazon Bedrock -> Agents**.
-2. Click on **sentinel-security-agent** and hit **Prepare** in the `Test` chat window on the right.
-3. Test the **Audit** intent by typing: *"Can you identify any insecure S3 buckets in our account?"*
-4. Test the **Remediate** intent by typing: *"Please securely lockdown the exact S3 bucket named `[Insecure Bucket]`."*
+### Step 3: Execute the Autonomous Loop
+Because some sandbox environments intentionally block the managed `bedrock:InvokeAgent` API at the parent Organization level, we decoupled the architecture! We execute the exact same Action Group natively on the local terminal using the Bedrock Converse API to strictly simulate managed execution.
+1. Clear ghost credentials and launch the orchestrator:
+   ```bash
+   unset AWS_SESSION_TOKEN
+   ./.venv/bin/python projects/02-sentinel-ai/demo_agent.py
+   ```
+2. Command the LLM to trigger the internal OpenAPI audit schema: 
+   **"Please audit my AWS account and find all insecure S3 buckets."**
+3. Notice the `[⚙️ Action Group Engaged]` output? You are seeing Claude autonomously select the correct API endpoint and seamlessly pipe your intent into our custom `lambda_handler`.
+4. Instruct the agent to fix the vulnerability: 
+   **"Please secure the [bucket_name] bucket for me."**
+
+### Step 4: Cryptographic Verification (Proof of Execution)
+To prove the AI didn't just carelessly hallucinate a response, but tangibly invoked `boto3` AWS modification APIs under the hood, verify the bucket state directly on AWS!
+
+```bash
+# First, find the names of the buckets our Terraform auto-spawned:
+aws s3api list-buckets --query "Buckets[?contains(Name, 'sentinel-insecure')].Name"
+
+# Query the Public Access Block state of the bucket the agent just remediated:
+# (If successful, the backend API will explicitly show that all 4 security locks are now true!)
+aws s3api get-public-access-block --bucket <bucket-the-agent-remediated>
+```
 
 ### ⚠️ Principal Architect Handling: SCP Limitations
 If you run into an error stating:
