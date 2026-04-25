@@ -25,8 +25,8 @@ if [ -n "$AWS_SESSION_TOKEN" ]; then
   echo "✅ AWS_SESSION_TOKEN updated."
 else
   # If empty, delete or set empty so it doesn't break non-lab auth
-  gh secret set AWS_SESSION_TOKEN --body ""
-  echo "✅ AWS_SESSION_TOKEN cleared (not provided)."
+  gh secret remove AWS_SESSION_TOKEN >/dev/null 2>&1 || true
+  echo "✅ AWS_SESSION_TOKEN cleared (removed)."
 fi
 
 echo "Success! Your GitHub Actions pipeline now has the latest ephemeral lab credentials."
