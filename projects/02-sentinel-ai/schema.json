@@ -1,0 +1,60 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "SentinelAI S3 Security Auditor",
+        "version": "1.0.0",
+        "description": "API for SentinelAI to audit S3 buckets for open public access and dynamically remediate them."
+    },
+    "paths": {
+        "/audit-s3": {
+            "get": {
+                "summary": "Lists all S3 buckets and their public access status.",
+                "operationId": "auditS3Buckets",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/secure-s3": {
+            "post": {
+                "summary": "Enables strict Block Public Access constraints on a specific S3 bucket.",
+                "operationId": "secureBucket",
+                "parameters": [
+                    {
+                        "name": "bucketName",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The exact name of the S3 bucket to secure."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
