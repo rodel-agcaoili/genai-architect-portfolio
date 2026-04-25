@@ -1,12 +1,11 @@
-name: SentinelAI CI Pipeline
+name: Deploy SentinelAI Pipeline
 
 on:
   push:
+    branches: [ main ]
     paths:
       - 'projects/02-sentinel-ai/**'
-  pull_request:
-    paths:
-      - 'projects/02-sentinel-ai/**'
+  workflow_dispatch: # Allows manual 'hydrate' execution
 
 jobs:
   test:
@@ -31,26 +30,34 @@ jobs:
         cd projects/02-sentinel-ai
         python test_remediator.py
 
-  terraform-plan:
+  terraform-apply:
+    name: Terraform Deploy
     runs-on: ubuntu-latest
-    needs: test
+    needs: test # Only deploy if Moto mock tests pass
+    permissions:
+      contents: read
+
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
 
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
+      
+    - name: Clean Previous Builds
+      run: |
+        rm -rf projects/02-sentinel-ai/remediator.zip
 
-    # Assuming AWS credentials will be added as secrets
-    - name: Terraform Init & Plan
-      env:
-        AWS_ACCESS_KEY_ID: "mock"
-        AWS_SECRET_ACCESS_KEY: "mock"
-        AWS_DEFAULT_REGION: "us-east-1"
+    - name: Terraform Init & Apply
       run: |
         cd projects/02-sentinel-ai
         terraform init
-        # We can't run a real plan without real credentials in Actions unless configured with OIDC.
-        # We will use formatting and validation to ensure Terraform is lexically sound.
-        terraform fmt -check
-        terraform validate
+        terraform apply -auto-approve
