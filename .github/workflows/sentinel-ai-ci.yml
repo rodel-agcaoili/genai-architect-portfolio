@@ -1,0 +1,56 @@
+name: SentinelAI CI Pipeline
+
+on:
+  push:
+    paths:
+      - 'projects/02-sentinel-ai/**'
+  pull_request:
+    paths:
+      - 'projects/02-sentinel-ai/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        cd projects/02-sentinel-ai
+        pip install -r requirements-test.txt
+
+    - name: Run Synthetic Mock Tests
+      run: |
+        cd projects/02-sentinel-ai
+        python test_remediator.py
+
+  terraform-plan:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    # Assuming AWS credentials will be added as secrets
+    - name: Terraform Init & Plan
+      env:
+        AWS_ACCESS_KEY_ID: "mock"
+        AWS_SECRET_ACCESS_KEY: "mock"
+        AWS_DEFAULT_REGION: "us-east-1"
+      run: |
+        cd projects/02-sentinel-ai
+        terraform init
+        # We can't run a real plan without real credentials in Actions unless configured with OIDC.
+        # We will use formatting and validation to ensure Terraform is lexically sound.
+        terraform fmt -check
+        terraform validate
