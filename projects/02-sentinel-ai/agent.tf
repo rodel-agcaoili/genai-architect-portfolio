@@ -6,10 +6,10 @@
 # -----------------------------------------------------------------------------------------
 
 resource "aws_bedrockagent_agent" "sentinel_agent" {
-  agent_name                  = "sentinel-security-agent"
-  foundation_model            = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
-  
-  instruction                 = <<EOT
+  agent_name       = "sentinel-security-agent"
+  foundation_model = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+
+  instruction = <<EOT
     You are SentinelAI, a Senior Security Auditor for the AWS Generative AI Platform.
     Your primary goal is to identify and remediate security misconfigurations, specifically 
     focusing on AWS S3 buckets.
@@ -27,7 +27,7 @@ resource "aws_bedrockagent_agent" "sentinel_agent" {
 resource "aws_bedrockagent_agent_action_group" "s3_auditor" {
   action_group_name          = "S3SecurityActionGroup"
   agent_id                   = aws_bedrockagent_agent.sentinel_agent.id
-  agent_version              = "DRAFT" 
+  agent_version              = "DRAFT"
   skip_resource_in_use_check = true
 
   action_group_executor {
@@ -62,7 +62,7 @@ resource "aws_lambda_function" "agent_remediator" {
 resource "aws_iam_role" "lambda_exec_role" {
   name = "sentinel-lambda-exec-role"
   assume_role_policy = jsonencode({
-    Version = "2012-10-17"
+    Version   = "2012-10-17"
     Statement = [{ Action = "sts:AssumeRole", Effect = "Allow", Principal = { Service = "lambda.amazonaws.com" } }]
   })
 }
@@ -74,8 +74,8 @@ resource "aws_iam_role_policy" "lambda_s3_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Action = ["s3:ListAllMyBuckets", "s3:GetBucketPublicAccessBlock", "s3:PutBucketPublicAccessBlock"]
-        Effect = "Allow"
+        Action   = ["s3:ListAllMyBuckets", "s3:GetBucketPublicAccessBlock", "s3:PutBucketPublicAccessBlock"]
+        Effect   = "Allow"
         Resource = "*"
       }
     ]
