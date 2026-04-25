@@ -1,6 +1,5 @@
 #!/bin/bash
 # -----------------------------------------------------------------------------------------
-# PRINCIPAL's NARRATIVE:
 # "To handle the ephemeral nature of Pluralsight/ACloudGuru sandbox environments, 
 # I developed this operational script. It securely extracts temporary AWS IAM tokens
 # from the local terminal environment and seamlessly injects them into GitHub Actions Secrets.
@@ -29,4 +28,4 @@ echo "✅ AWS_SECRET_ACCESS_KEY updated."
 gh secret set AWS_SESSION_TOKEN --body "$AWS_SESSION_TOKEN"
 echo "✅ AWS_SESSION_TOKEN updated."
 
-echo "🎉 Success! Your GitHub Actions pipeline now has the latest ephemeral lab credentials."
+echo "Success! Your GitHub Actions pipeline now has the latest ephemeral lab credentials."
