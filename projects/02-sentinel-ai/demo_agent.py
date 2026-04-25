@@ -10,7 +10,7 @@ import remediator
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
 
 # -----------------------------------------------------------------------------------------
-# PRINCIPAL's NARRATIVE (Workaround):
+# Workaround:
 # "When my ACloudGuru Lab environment SCP blocked 'bedrock:InvokeAgent', I didn't abandon 
 # the architecture. Instead, I decoupled the orchestration layer. I utilized the 
 # Bedrock Converse API to manually bind the OpenAPI Tool specification directly to Claude 3.7. 
