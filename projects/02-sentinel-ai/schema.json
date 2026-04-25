@@ -9,6 +9,7 @@
         "/audit-s3": {
             "get": {
                 "summary": "Lists all S3 buckets and their public access status.",
+                "description": "Lists S3 buckets and reports INSECURE or SECURE.",
                 "operationId": "auditS3Buckets",
                 "responses": {
                     "200": {
@@ -18,7 +19,15 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "type": "object"
+                                        "type": "object",
+                                        "properties": {
+                                            "bucketName": {
+                                                "type": "string"
+                                            },
+                                            "securityStatus": {
+                                                "type": "string"
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -30,6 +39,7 @@
         "/secure-s3": {
             "post": {
                 "summary": "Enables strict Block Public Access constraints on a specific S3 bucket.",
+                "description": "Takes a bucketName and secures it natively via IAM constraints.",
                 "operationId": "secureBucket",
                 "parameters": [
                     {
@@ -48,7 +58,12 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "string"
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         }
