@@ -269,8 +269,8 @@ elif page == "1: Secure RAG":
     
     with tab1:
         st.markdown("### Upload Document to S3 Landing Zone")
-        doc_text = st.text_area("Document Content", placeholder="Paste text content to ingest into the vector database...", height=150)
-        filename = st.text_input("Filename", value="demo_document.txt")
+        doc_text = st.text_area("Document Content", value="Rodel Agcaoili is a Senior Cloud Engineer and AI Infrastructure expert specializing in AWS Bedrock, Terraform, and GenAI security architectures. This is the first document chunk for the vector database containing initial foundational knowledge payload.", height=150)
+        filename = st.text_input("Filename", value="test_doc_1.txt")
         
         if st.button("Upload & Vectorize", type="primary"):
             if not st.session_state.aws_configured:
