@@ -222,6 +222,9 @@ elif page == "1: Secure RAG":
     </div>
     """, unsafe_allow_html=True)
     
+    if not st.session_state.aws_configured:
+        st.warning("Please configure your AWS credentials first via the sidebar.")
+    
     tab1, tab2 = st.tabs(["Upload & Ingest", "Query RAG"])
     
     with tab1:
@@ -230,51 +233,70 @@ elif page == "1: Secure RAG":
         filename = st.text_input("Filename", value="demo_document.txt")
         
         if st.button("Upload to S3", type="primary"):
-            try:
-                s3 = get_s3_client()
-                buckets = s3.list_buckets()['Buckets']
-                ingest_bucket = next((b['Name'] for b in buckets if b['Name'].startswith('rag-data-ingest-')), None)
-                
-                if ingest_bucket and doc_text:
-                    s3.put_object(Bucket=ingest_bucket, Key=filename, Body=doc_text.encode('utf-8'))
-                    st.success(f"Uploaded `{filename}` to `{ingest_bucket}`")
+            if not st.session_state.aws_configured:
+                st.error("AWS credentials not configured. Go to AWS Credentials page first.")
+            elif not doc_text:
+                st.error("Please enter document content.")
+            else:
+                try:
+                    s3 = get_s3_client()
+                    buckets = s3.list_buckets()['Buckets']
+                    bucket_names = [b['Name'] for b in buckets]
+                    st.caption(f"Discovered {len(bucket_names)} buckets: {', '.join(bucket_names[:5])}{'...' if len(bucket_names) > 5 else ''}")
                     
-                    with st.spinner("Waiting for Lambda ingestion (10s)..."):
-                        time.sleep(10)
+                    ingest_bucket = next((b for b in bucket_names if 'ingest' in b or 'data' in b or 'landing' in b or 'rag' in b), None)
                     
-                    vector_bucket = next((b['Name'] for b in buckets if b['Name'].startswith('rag-vector-store-')), None)
-                    if vector_bucket:
-                        try:
-                            obj = s3.head_object(Bucket=vector_bucket, Key="indices/my_vector_index.faiss")
-                            st.markdown(f"""
-                            <div class="metric-card">
-                                <h3>FAISS Index Status</h3>
-                                <div class="value">{obj['ContentLength']} bytes</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        except:
-                            st.warning("FAISS index not yet available. Check Lambda logs.")
-                else:
-                    st.error("Could not locate ingest bucket or empty content.")
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
+                    if ingest_bucket:
+                        s3.put_object(Bucket=ingest_bucket, Key=filename, Body=doc_text.encode('utf-8'))
+                        st.success(f"Uploaded `{filename}` to `{ingest_bucket}`")
+                        
+                        with st.spinner("Waiting for Lambda ingestion (10s)..."):
+                            time.sleep(10)
+                        
+                        vector_bucket = next((b for b in bucket_names if 'vector' in b or 'index' in b), None)
+                        if vector_bucket:
+                            try:
+                                obj = s3.head_object(Bucket=vector_bucket, Key="indices/my_vector_index.faiss")
+                                st.markdown(f"""
+                                <div class="metric-card">
+                                    <h3>FAISS Index Status</h3>
+                                    <div class="value">{obj['ContentLength']} bytes</div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            except:
+                                st.warning("FAISS index not yet available. Lambda may still be processing.")
+                        else:
+                            st.info(f"No vector store bucket found. Available: {', '.join(bucket_names)}")
+                    else:
+                        st.error(f"No ingest bucket found. Available buckets: {', '.join(bucket_names)}")
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
     
     with tab2:
         st.markdown("### Query the RAG Pipeline")
         query = st.text_input("Ask a question", placeholder="What is Rodel's expertise?")
         if st.button("Query", type="primary"):
-            try:
-                lambda_cl = boto3.client('lambda', **_creds_kwargs())
-                fns = lambda_cl.list_functions()['Functions']
-                query_fn = next((f['FunctionName'] for f in fns if 'rag-query-' in f['FunctionName']), None)
-                if query_fn:
-                    resp = lambda_cl.invoke(FunctionName=query_fn, Payload=json.dumps({"query": query}))
-                    result = json.loads(resp['Payload'].read())
-                    st.markdown(f"**RAG Response:** {result.get('answer', result)}")
-                else:
-                    st.warning("Query Lambda not found.")
-            except Exception as e:
-                st.error(str(e))
+            if not st.session_state.aws_configured:
+                st.error("AWS credentials not configured.")
+            elif not query:
+                st.error("Please enter a question.")
+            else:
+                try:
+                    lambda_cl = boto3.client('lambda', **_creds_kwargs())
+                    fns = lambda_cl.list_functions()['Functions']
+                    fn_names = [f['FunctionName'] for f in fns]
+                    st.caption(f"Discovered {len(fn_names)} Lambda functions")
+                    
+                    query_fn = next((f for f in fn_names if 'query' in f.lower() or 'rag' in f.lower()), None)
+                    if query_fn:
+                        st.info(f"Invoking: `{query_fn}`")
+                        resp = lambda_cl.invoke(FunctionName=query_fn, Payload=json.dumps({"query": query}))
+                        result = json.loads(resp['Payload'].read())
+                        st.markdown(f"**RAG Response:** {result.get('answer', result)}")
+                    else:
+                        st.warning(f"No RAG query Lambda found. Available: {', '.join(fn_names[:10])}")
+                except Exception as e:
+                    st.error(str(e))
 
 # -------------------------------------------------------------------------
 # PAGE: PROJECT 2 — SENTINELAI
@@ -287,34 +309,51 @@ elif page == "2: SentinelAI":
     </div>
     """, unsafe_allow_html=True)
     
+    if not st.session_state.aws_configured:
+        st.warning("Please configure your AWS credentials first via the sidebar.")
+    
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("### S3 Bucket Audit")
         if st.button("Run Security Audit", type="primary"):
-            try:
-                s3 = get_s3_client()
-                buckets = s3.list_buckets()['Buckets']
-                
-                for bucket in buckets:
-                    name = bucket['Name']
-                    try:
-                        pab = s3.get_public_access_block(Bucket=name)
-                        config = pab['PublicAccessBlockConfiguration']
-                        secure = all(config.values())
-                        status = "SECURE" if secure else "VULNERABLE"
-                        color = "status-pass" if secure else "status-fail"
-                        st.markdown(f'`{name}` — <span class="{color}">{status}</span>', unsafe_allow_html=True)
-                    except:
-                        st.markdown(f'`{name}` — <span class="status-fail">NO PUBLIC ACCESS BLOCK</span>', unsafe_allow_html=True)
-            except Exception as e:
-                st.error(str(e))
+            if not st.session_state.aws_configured:
+                st.error("AWS credentials not configured.")
+            else:
+                try:
+                    s3 = get_s3_client()
+                    buckets = s3.list_buckets()['Buckets']
+                    st.caption(f"Scanning {len(buckets)} buckets...")
+                    
+                    secure_count = 0
+                    vuln_count = 0
+                    for bucket in buckets:
+                        name = bucket['Name']
+                        try:
+                            pab = s3.get_public_access_block(Bucket=name)
+                            config = pab['PublicAccessBlockConfiguration']
+                            secure = all(config.values())
+                            status = "SECURE" if secure else "VULNERABLE"
+                            color = "status-pass" if secure else "status-fail"
+                            st.markdown(f'`{name}` — <span class="{color}">{status}</span>', unsafe_allow_html=True)
+                            if secure: secure_count += 1
+                            else: vuln_count += 1
+                        except:
+                            vuln_count += 1
+                            st.markdown(f'`{name}` — <span class="status-fail">NO PUBLIC ACCESS BLOCK</span>', unsafe_allow_html=True)
+                    
+                    st.markdown("---")
+                    st.markdown(f"**Summary:** {secure_count} secure, {vuln_count} vulnerable out of {len(buckets)} total")
+                except Exception as e:
+                    st.error(str(e))
     
     with col2:
         st.markdown("### Remediate Bucket")
         bucket_name = st.text_input("Bucket Name to Secure")
         if st.button("Apply Security Block", type="primary"):
-            if bucket_name:
+            if not st.session_state.aws_configured:
+                st.error("AWS credentials not configured.")
+            elif bucket_name:
                 try:
                     s3 = get_s3_client()
                     s3.put_public_access_block(
@@ -397,17 +436,11 @@ elif page == "4: Incident Responder":
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("""
-    ```mermaid
-    stateDiagram-v2
-        [*] --> TriageAgent: Incident Alert
-        TriageAgent --> RunbookAgent: Known Issue
-        TriageAgent --> EscalationAgent: Unknown Anomaly
-        RunbookAgent --> [*]: Fix Found
-        RunbookAgent --> EscalationAgent: No Fix (Cyclical Re-route)
-        EscalationAgent --> [*]: Jira Ticket Drafted
-    ```
-    """)
+    lg_path = os.path.join(os.path.dirname(__file__), "langgraph.png")
+    if os.path.exists(lg_path):
+        st.image(lg_path, caption="LangGraph Multi-Agent State Machine", use_container_width=True)
+    else:
+        st.info("LangGraph diagram not found.")
     
     alert_text = st.text_area("Simulated Server Alert:", height=100,
         placeholder="e.g., HTTP 503 Timeout on the Payment Gateway")
@@ -503,12 +536,18 @@ elif page == "5: Drift Evaluator":
         cases = TEST_CASES
     
     if st.button("Run Evaluation Pipeline", type="primary"):
-        for test in cases:
-            st.markdown(f"### {test['name']}")
+        for i, test in enumerate(cases, 1):
+            st.markdown(f"### Eval {i}: {test['name']}")
+            
+            # Show the test inputs
+            with st.expander("View Test Payload", expanded=True):
+                st.markdown(f"**Question:** {test['question']}")
+                st.markdown(f"**Source Context:** {test['context']}")
+                st.markdown(f"**Generated Answer:** {test['answer']}")
             
             col1, col2, col3 = st.columns(3)
             
-            with st.spinner(f"Judging: {test['name']}..."):
+            with st.spinner(f"Judge (Haiku) evaluating: {test['name']}..."):
                 # Faithfulness
                 f_system = """You are a strict Faithfulness Evaluator. Given [SOURCE CONTEXT] and [GENERATED ANSWER], score if the answer derives from context. Respond ONLY with JSON: {"score": <0.0-1.0>, "reasoning": "<one sentence>"}"""
                 f_raw = invoke_bedrock(f"[SOURCE CONTEXT]: {test['context']}\n\n[GENERATED ANSWER]: {test['answer']}", f_system)
