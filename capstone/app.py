@@ -66,12 +66,28 @@ st.markdown("""
 # -------------------------------------------------------------------------
 if 'aws_configured' not in st.session_state:
     st.session_state.aws_configured = False
+if 'aws_creds' not in st.session_state:
+    st.session_state.aws_creds = {}
+
+def _creds_kwargs():
+    """Return explicit credential kwargs for boto3 clients, sourced from session state."""
+    c = st.session_state.aws_creds
+    if not c:
+        return {"region_name": "us-east-1"}
+    kwargs = {
+        "region_name": "us-east-1",
+        "aws_access_key_id": c.get("access_key"),
+        "aws_secret_access_key": c.get("secret_key"),
+    }
+    if c.get("session_token"):
+        kwargs["aws_session_token"] = c["session_token"]
+    return kwargs
 
 def get_bedrock_client():
-    return boto3.client('bedrock-runtime', region_name='us-east-1')
+    return boto3.client('bedrock-runtime', **_creds_kwargs())
 
 def get_s3_client():
-    return boto3.client('s3', region_name='us-east-1')
+    return boto3.client('s3', **_creds_kwargs())
 
 def invoke_bedrock(prompt, system, model="anthropic.claude-3-haiku-20240307-v1:0"):
     try:
@@ -178,25 +194,21 @@ elif page == "AWS Credentials":
         submitted = st.form_submit_button("Authenticate", type="primary")
         
         if submitted and access_key and secret_key:
-            os.environ['AWS_ACCESS_KEY_ID'] = access_key
-            os.environ['AWS_SECRET_ACCESS_KEY'] = secret_key
-            if session_token:
-                os.environ['AWS_SESSION_TOKEN'] = session_token
-            elif 'AWS_SESSION_TOKEN' in os.environ:
-                del os.environ['AWS_SESSION_TOKEN']
+            # Store in session state for explicit boto3 client usage
+            st.session_state.aws_creds = {
+                "access_key": access_key,
+                "secret_key": secret_key,
+                "session_token": session_token if session_token else None
+            }
             
             # Validate connectivity
             try:
-                sts = boto3.client('sts',
-                    aws_access_key_id=access_key,
-                    aws_secret_access_key=secret_key,
-                    aws_session_token=session_token if session_token else None,
-                    region_name='us-east-1'
-                )
+                sts = boto3.client('sts', **_creds_kwargs())
                 identity = sts.get_caller_identity()
                 st.session_state.aws_configured = True
                 st.success(f"Authenticated as: `{identity['Arn']}`")
             except Exception as e:
+                st.session_state.aws_configured = False
                 st.error(f"Authentication failed: {str(e)}")
 
 # -------------------------------------------------------------------------
@@ -252,7 +264,7 @@ elif page == "1: Secure RAG":
         query = st.text_input("Ask a question", placeholder="What is Rodel's expertise?")
         if st.button("Query", type="primary"):
             try:
-                lambda_cl = boto3.client('lambda', region_name='us-east-1')
+                lambda_cl = boto3.client('lambda', **_creds_kwargs())
                 fns = lambda_cl.list_functions()['Functions']
                 query_fn = next((f['FunctionName'] for f in fns if 'rag-query-' in f['FunctionName']), None)
                 if query_fn:
