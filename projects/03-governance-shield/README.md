@@ -27,7 +27,7 @@ Because the native AWS resource creation was blocked, the outer-layer Python Lam
 1. **Zero-Latency PII Masking:** Standard Python deterministic regex explicitly scrubs SSNs natively.
 2. **Deterministic LLM System Constraints:** A highly restrictive `system` override is forcefully injected into the Bedrock LLM payload. It mathematically forces the foundation model to mimic the exact behavior of an AWS Guardrail, generating native `[BEDROCK GUARDRAIL EXECUTED] ACCESS DENIED` interrupts if malicious payload attacks or explicitly blacklisted internal topics are attempted. 
 
-*The Interview Value:* You functionally achieved identical Defense-in-Depth capabilities, cleanly decoupling the application security posture from rigid Multi-Cloud environment configurations while bypassing arbitrary external organizational constraints.
+*Key Achievement:* Functionally achieved identical Defense-in-Depth capabilities, cleanly decoupling the application security posture from rigid Multi-Cloud environment configurations while bypassing arbitrary external organizational constraints.
 
 ### Step 2: Testing the Shield
 Once deployed, run the local `demo_shield.py` script. The script is designed to bypass standard CLI tooling and natively invoke the backend Serverless proxy using four distinct payload attacks:
