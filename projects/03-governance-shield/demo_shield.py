@@ -19,9 +19,12 @@ def test_payload(test_name, prompt):
         mock_event = {"prompt": prompt}
         result = proxy_module.lambda_handler(mock_event, None)
         
+        # ALWAYS print what the Outer Layer did first
+        if "scrubbed_prompt" in result:
+            print(f"[OUTER LAYER SCRUBBED]: {result.get('scrubbed_prompt')}")
+            
         if result.get("statusCode") == 200:
             print("[SHIELD STATUS]: PASSED (Clean)")
-            print(f"[OUTER LAYER SCRUBBED]: {result.get('scrubbed_prompt')}")
             print(f"[INNER LAYER RESPONSE]: {result.get('model_response')}")
         elif result.get("statusCode") == 403:
             print("[SHIELD STATUS]: BLOCKED (Guardrail Interception)")

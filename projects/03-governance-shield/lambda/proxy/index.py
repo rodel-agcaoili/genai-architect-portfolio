@@ -59,6 +59,7 @@ def lambda_handler(event, context):
         if "[BEDROCK GUARDRAIL EXECUTED]" in model_output:
             return {
                 "statusCode": 403,
+                "scrubbed_prompt": anonymized_prompt,
                 "guardrail_intercept": "BLOCKED",
                 "error_detail": model_output
             }
