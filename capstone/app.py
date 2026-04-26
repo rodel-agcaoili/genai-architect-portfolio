@@ -222,6 +222,15 @@ elif page == "1: Secure RAG":
     </div>
     """, unsafe_allow_html=True)
     
+    st.markdown("""
+    **What this project does:** A serverless RAG (Retrieval-Augmented Generation) pipeline. Documents uploaded to S3 trigger a Lambda function 
+    that generates vector embeddings via Bedrock Titan, stores them in a FAISS index on S3, and enables semantic search queries against the corpus.
+    
+    **How testing works:** This page requires the Project 1 Terraform infrastructure to be deployed first (`terraform apply` in `projects/01-secure-rag/`). 
+    Once deployed, upload a document below to trigger the Lambda ingestor, then query the RAG pipeline.
+    If infrastructure is not yet deployed, use the standalone CLI script instead: `./.venv/bin/python projects/01-secure-rag/demo_upload.py`
+    """)
+    
     if not st.session_state.aws_configured:
         st.warning("Please configure your AWS credentials first via the sidebar.")
     
@@ -309,9 +318,53 @@ elif page == "2: SentinelAI":
     </div>
     """, unsafe_allow_html=True)
     
+    st.markdown("""
+    **What this project does:** An autonomous S3 security remediation agent powered by Amazon Bedrock. It audits all S3 buckets in the account, 
+    identifies those missing Public Access Blocks, and applies security fixes with full idempotency.
+    
+    **How testing works:** Click **"Spawn Vulnerable Test Buckets"** below to programmatically create intentionally insecure S3 buckets (no Public Access Block). 
+    Then click **"Run Security Audit"** to scan them, and use the **"Remediate"** panel to apply security blocks. Re-audit to confirm the fix.
+    """)
+    
     if not st.session_state.aws_configured:
         st.warning("Please configure your AWS credentials first via the sidebar.")
     
+    # Test infrastructure
+    st.markdown("### Test Infrastructure")
+    test_col1, test_col2 = st.columns(2)
+    with test_col1:
+        num_buckets = st.number_input("Number of vulnerable buckets to create", min_value=1, max_value=5, value=2)
+    with test_col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("Spawn Vulnerable Test Buckets", type="secondary"):
+            if not st.session_state.aws_configured:
+                st.error("AWS credentials not configured.")
+            else:
+                try:
+                    s3 = get_s3_client()
+                    sts = boto3.client('sts', **_creds_kwargs())
+                    acct = sts.get_caller_identity()['Account']
+                    created = []
+                    for i in range(num_buckets):
+                        bname = f"sentinel-vuln-test-{acct}-{i}"
+                        try:
+                            s3.create_bucket(Bucket=bname)
+                            # Explicitly remove any default public access blocks
+                            try:
+                                s3.delete_public_access_block(Bucket=bname)
+                            except:
+                                pass
+                            created.append(bname)
+                        except s3.exceptions.BucketAlreadyOwnedByYou:
+                            created.append(f"{bname} (already exists)")
+                        except Exception as e:
+                            st.warning(f"Could not create `{bname}`: {e}")
+                    if created:
+                        st.success(f"Created {len(created)} vulnerable test buckets: {', '.join(created)}")
+                except Exception as e:
+                    st.error(str(e))
+    
+    st.markdown("---")
     col1, col2 = st.columns(2)
     
     with col1:
@@ -380,6 +433,15 @@ elif page == "3: Governance Shield":
     </div>
     """, unsafe_allow_html=True)
     
+    st.markdown("""
+    **What this project does:** A dual-layered Defense-in-Depth security proxy that protects LLM interactions. The **Outer Layer** uses deterministic 
+    Python Regex to scrub PII (SSNs, credit cards, internal codenames) before transmission. The **Inner Layer** uses LLM System Instructions 
+    to block prompt injection attacks, hate speech, and sensitive corporate topics.
+    
+    **How testing works:** Type any prompt below. Try including an SSN (`123-45-6789`), a project codename (`Project Zeus`), 
+    or a prompt injection (`Ignore all previous instructions`). Watch the left panel show PII scrubbing and the right panel show guardrail enforcement.
+    """)
+    
     PII_PATTERNS = {
         "SSN": r"\b\d{3}-\d{2}-\d{4}\b",
         "CREDIT_CARD": r"\b(?:\d[ -]*?){13,16}\b",
@@ -435,6 +497,16 @@ elif page == "4: Incident Responder":
         <p>LangGraph Multi-Agent State Machine Orchestrator</p>
     </div>
     """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    **What this project does:** A multi-agent state machine built with LangGraph (chosen over AWS Step Functions / Bedrock Strands). 
+    Three specialized agents communicate over shared state: a **Triage Agent** classifies incidents, a **Runbook Agent** searches for fixes, 
+    and an **Escalation Agent** drafts Jira tickets. The architecture supports cyclical re-routing — if the Runbook agent fails, 
+    it autonomously routes back to Escalation.
+    
+    **How testing works:** Select a preset alert or type a custom one. The first preset (503 timeout) routes through Triage → Runbook → Resolved. 
+    The second preset (kernel panic) routes through Triage → Runbook (fails) → Escalation → Jira Ticket.
+    """)
     
     lg_path = os.path.join(os.path.dirname(__file__), "langgraph.png")
     if os.path.exists(lg_path):
@@ -503,6 +575,17 @@ elif page == "5: Drift Evaluator":
         <p>Native LLM-as-a-Judge MLOps Pipeline (RAGAS-equivalent)</p>
     </div>
     """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    **What this project does:** A native LLM-as-a-Judge evaluation pipeline that solves the "Black Box" problem in production GenAI. 
+    Instead of using the RAGAS SDK (which adds heavy LangChain dependencies), we built the evaluation engine from scratch using `boto3`. 
+    Claude 3 Haiku acts as a strict grader, scoring RAG outputs on **Faithfulness** (is the answer grounded in the source context?) 
+    and **Relevancy** (does the answer actually address the question?).
+    
+    **How testing works:** The preset tests fire 3 synthetic RAG traces through the Judge: a perfect answer (should PASS), 
+    a hallucinated answer (should FAIL on Faithfulness), and an evasive answer (should FAIL on Relevancy). 
+    Each test displays the full payload being evaluated, the scores, and a Quality Gate verdict.
+    """)
     
     TEST_CASES = [
         {
