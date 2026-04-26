@@ -374,19 +374,65 @@ elif page == "1: Secure RAG":
                 st.error("Please enter a question.")
             else:
                 try:
-                    lambda_cl = boto3.client('lambda', **_creds_kwargs())
-                    fns = lambda_cl.list_functions()['Functions']
-                    fn_names = [f['FunctionName'] for f in fns]
-                    st.caption(f"Discovered {len(fn_names)} Lambda functions")
+                    import numpy as np
+                    import faiss
+                    import tempfile
                     
-                    query_fn = next((f for f in fn_names if 'query' in f.lower() or 'rag' in f.lower()), None)
-                    if query_fn:
-                        st.info(f"Invoking: `{query_fn}`")
-                        resp = lambda_cl.invoke(FunctionName=query_fn, Payload=json.dumps({"query": query}))
-                        result = json.loads(resp['Payload'].read())
-                        st.markdown(f"**RAG Response:** {result.get('answer', result)}")
+                    s3 = get_s3_client()
+                    buckets = [b['Name'] for b in s3.list_buckets()['Buckets']]
+                    vector_bucket = next((b for b in buckets if 'vector' in b or 'store' in b), None)
+                    
+                    if not vector_bucket:
+                        st.error("No vector store bucket found. Hydrate infrastructure and upload a document first.")
                     else:
-                        st.warning(f"No RAG query Lambda found. Available: {', '.join(fn_names[:10])}")
+                        INDEX_KEY = "indices/my_vector_index.faiss"
+                        
+                        # Step 1: Embed the query with the SAME Titan model used for ingestion
+                        with st.spinner("Embedding query via Bedrock Titan..."):
+                            bedrock = get_bedrock_client()
+                            embed_resp = bedrock.invoke_model(
+                                modelId="amazon.titan-embed-text-v2:0",
+                                contentType="application/json",
+                                accept="application/json",
+                                body=json.dumps({"inputText": query})
+                            )
+                            query_vector = json.loads(embed_resp['body'].read())['embedding']
+                        st.caption(f"Query embedded: {len(query_vector)}-dim vector")
+                        
+                        # Step 2: Download FAISS index and search
+                        with st.spinner("Searching FAISS vector index..."):
+                            with tempfile.NamedTemporaryFile(suffix=".faiss", delete=False) as tmp:
+                                s3.download_file(vector_bucket, INDEX_KEY, tmp.name)
+                                index = faiss.read_index(tmp.name)
+                            
+                            k = min(3, index.ntotal)
+                            distances, indices_arr = index.search(np.array([query_vector]).astype('float32'), k)
+                        
+                        st.caption(f"Retrieved top-{k} nearest vectors from {index.ntotal} total (distances: {[f'{d:.2f}' for d in distances[0]]})")
+                        
+                        # Step 3: Augmented Generation via Bedrock Claude
+                        with st.spinner("Generating RAG response via Bedrock Claude..."):
+                            # List ingest bucket documents as context source
+                            ingest_bucket = next((b for b in buckets if 'ingest' in b or 'rag' in b), None)
+                            context_text = ""
+                            if ingest_bucket:
+                                try:
+                                    objs = s3.list_objects_v2(Bucket=ingest_bucket).get('Contents', [])
+                                    for obj in objs[:5]:
+                                        doc = s3.get_object(Bucket=ingest_bucket, Key=obj['Key'])
+                                        context_text += doc['Body'].read().decode('utf-8') + "\n\n"
+                                except:
+                                    pass
+                            
+                            if not context_text:
+                                context_text = "No document context available."
+                            
+                            answer = invoke_bedrock(
+                                f"Context: {context_text}\n\nQuestion: {query}\n\nAnswer:",
+                                "You are a helpful AI assistant. Use the provided context to answer questions. If the answer isn't in the context, say you don't know."
+                            )
+                        
+                        st.markdown(f"**RAG Response:**\n\n{answer}")
                 except Exception as e:
                     st.error(str(e))
 
