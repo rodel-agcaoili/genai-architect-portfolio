@@ -15,8 +15,7 @@ resource "aws_lambda_function" "governance_proxy" {
 
   environment {
     variables = {
-      GUARDRAIL_ID      = aws_bedrock_guardrail.enterprise_shield.guardrail_id
-      GUARDRAIL_VERSION = aws_bedrock_guardrail_version.v1.version
+      GUARDRAIL_FALLBACK_ACTIVE = "true"
     }
   }
 }

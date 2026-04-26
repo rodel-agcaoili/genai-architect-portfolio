@@ -31,13 +31,6 @@ resource "aws_iam_role_policy" "proxy_bedrock_policy" {
       },
       {
         Action = [
-          "bedrock:ApplyGuardrail"
-        ]
-        Effect   = "Allow"
-        Resource = aws_bedrock_guardrail.enterprise_shield.guardrail_arn
-      },
-      {
-        Action = [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents"
