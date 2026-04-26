@@ -226,14 +226,45 @@ elif page == "1: Secure RAG":
     **What this project does:** A serverless RAG (Retrieval-Augmented Generation) pipeline. Documents uploaded to S3 trigger a Lambda function 
     that generates vector embeddings via Bedrock Titan, stores them in a FAISS index on S3, and enables semantic search queries against the corpus.
     
-    **How testing works:** This page requires the Project 1 Terraform infrastructure to be deployed first (`terraform apply` in `projects/01-secure-rag/`). 
-    Once deployed, upload a document below to trigger the Lambda ingestor, then query the RAG pipeline.
-    If infrastructure is not yet deployed, use the standalone CLI script instead: `./.venv/bin/python projects/01-secure-rag/demo_upload.py`
+    **How testing works:** Click **"Hydrate RAG Infrastructure"** to create the S3 buckets needed for the demo. 
+    Once hydrated, upload a document to trigger ingestion, then query the RAG pipeline. 
+    Full Terraform deployment (Lambda + FAISS) is required for end-to-end functionality: `terraform apply` in `projects/01-secure-rag/`.
     """)
     
     if not st.session_state.aws_configured:
         st.warning("Please configure your AWS credentials first via the sidebar.")
     
+    # Hydrate infrastructure
+    st.markdown("### Hydrate RAG Infrastructure")
+    if st.button("Hydrate RAG Infrastructure", type="secondary"):
+        if not st.session_state.aws_configured:
+            st.error("AWS credentials not configured.")
+        else:
+            try:
+                s3 = get_s3_client()
+                sts = boto3.client('sts', **_creds_kwargs())
+                acct = sts.get_caller_identity()['Account']
+                
+                ingest_name = f"rag-data-ingest-{acct}"
+                vector_name = f"rag-vector-store-{acct}"
+                
+                created = []
+                for bname in [ingest_name, vector_name]:
+                    try:
+                        s3.create_bucket(Bucket=bname)
+                        created.append(bname)
+                    except s3.exceptions.BucketAlreadyOwnedByYou:
+                        created.append(f"{bname} (exists)")
+                    except Exception as e:
+                        st.warning(f"Could not create `{bname}`: {e}")
+                
+                if created:
+                    st.success(f"RAG buckets ready: {', '.join(created)}")
+                    st.info(f"**Ingest bucket:** `{ingest_name}` — upload documents here.\n\n**Vector bucket:** `{vector_name}` — FAISS indices stored here after Lambda processes uploads.")
+            except Exception as e:
+                st.error(str(e))
+    
+    st.markdown("---")
     tab1, tab2 = st.tabs(["Upload & Ingest", "Query RAG"])
     
     with tab1:
@@ -380,6 +411,7 @@ elif page == "2: SentinelAI":
                     
                     secure_count = 0
                     vuln_count = 0
+                    vuln_list = []
                     for bucket in buckets:
                         name = bucket['Name']
                         try:
@@ -389,11 +421,18 @@ elif page == "2: SentinelAI":
                             status = "SECURE" if secure else "VULNERABLE"
                             color = "status-pass" if secure else "status-fail"
                             st.markdown(f'`{name}` — <span class="{color}">{status}</span>', unsafe_allow_html=True)
-                            if secure: secure_count += 1
-                            else: vuln_count += 1
+                            if secure:
+                                secure_count += 1
+                            else:
+                                vuln_count += 1
+                                vuln_list.append(name)
                         except:
                             vuln_count += 1
+                            vuln_list.append(name)
                             st.markdown(f'`{name}` — <span class="status-fail">NO PUBLIC ACCESS BLOCK</span>', unsafe_allow_html=True)
+                    
+                    # Store vulnerable buckets in session state for remediation selectbox
+                    st.session_state.vuln_buckets = vuln_list
                     
                     st.markdown("---")
                     st.markdown(f"**Summary:** {secure_count} secure, {vuln_count} vulnerable out of {len(buckets)} total")
@@ -402,7 +441,15 @@ elif page == "2: SentinelAI":
     
     with col2:
         st.markdown("### Remediate Bucket")
-        bucket_name = st.text_input("Bucket Name to Secure")
+        
+        # Populate selectbox from audit results
+        vuln_options = st.session_state.get('vuln_buckets', [])
+        if vuln_options:
+            bucket_name = st.selectbox("Select a vulnerable bucket to remediate:", vuln_options)
+        else:
+            st.info("Run a Security Audit first to discover vulnerable buckets.")
+            bucket_name = st.text_input("Or enter bucket name manually:")
+        
         if st.button("Apply Security Block", type="primary"):
             if not st.session_state.aws_configured:
                 st.error("AWS credentials not configured.")
