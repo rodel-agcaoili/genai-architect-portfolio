@@ -149,24 +149,13 @@ if page == "Home":
     
     st.markdown("---")
     st.markdown("### Architecture Overview")
-    st.markdown("""
-    ```mermaid
-    graph TB
-        subgraph Portfolio["GenAI Architect Portfolio"]
-            P1["Secure RAG<br/>FAISS + Bedrock Titan"]
-            P2["SentinelAI<br/>Bedrock Agent + Lambda"]
-            P3["Governance Shield<br/>Regex PII + LLM Guardrails"]
-            P4["Incident Responder<br/>LangGraph State Machine"]
-            P5["Drift Evaluator<br/>LLM-as-a-Judge"]
-        end
-        
-        AWS["Amazon Bedrock"] --> P1
-        AWS --> P2
-        AWS --> P3
-        AWS --> P4
-        AWS --> P5
-    ```
-    """)
+    
+    import os
+    arch_path = os.path.join(os.path.dirname(__file__), "architecture.png")
+    if os.path.exists(arch_path):
+        st.image(arch_path, use_container_width=True)
+    else:
+        st.info("Architecture diagram not found. Ensure `capstone/architecture.png` exists.")
 
 # -------------------------------------------------------------------------
 # PAGE: AWS CREDENTIALS
