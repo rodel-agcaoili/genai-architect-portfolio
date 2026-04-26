@@ -290,23 +290,46 @@ elif page == "1: Secure RAG":
                         s3.put_object(Bucket=ingest_bucket, Key=filename, Body=doc_text.encode('utf-8'))
                         st.success(f"Uploaded `{filename}` to `{ingest_bucket}`")
                         
-                        with st.spinner("Waiting for Lambda ingestion (10s)..."):
-                            time.sleep(10)
+                        # Verify the document landed
+                        try:
+                            doc_obj = s3.head_object(Bucket=ingest_bucket, Key=filename)
+                            st.markdown(f"""
+                            <div class="metric-card">
+                                <h3>Document Uploaded</h3>
+                                <div class="value">{doc_obj['ContentLength']} bytes</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        except:
+                            pass
                         
-                        vector_bucket = next((b for b in bucket_names if 'vector' in b or 'index' in b), None)
-                        if vector_bucket:
-                            try:
-                                obj = s3.head_object(Bucket=vector_bucket, Key="indices/my_vector_index.faiss")
-                                st.markdown(f"""
-                                <div class="metric-card">
-                                    <h3>FAISS Index Status</h3>
-                                    <div class="value">{obj['ContentLength']} bytes</div>
-                                </div>
-                                """, unsafe_allow_html=True)
-                            except:
-                                st.warning("FAISS index not yet available. Lambda may still be processing.")
-                        else:
-                            st.info(f"No vector store bucket found. Available: {', '.join(bucket_names)}")
+                        # Check if Lambda ingestor exists
+                        try:
+                            lambda_cl = boto3.client('lambda', **_creds_kwargs())
+                            fns = lambda_cl.list_functions()['Functions']
+                            ingest_fn = next((f['FunctionName'] for f in fns if 'ingest' in f['FunctionName'].lower()), None)
+                            
+                            if ingest_fn:
+                                st.info(f"Lambda ingestor detected: `{ingest_fn}`. Waiting for FAISS processing...")
+                                with st.spinner("Waiting for Lambda ingestion (10s)..."):
+                                    time.sleep(10)
+                                
+                                vector_bucket = next((b for b in bucket_names if 'vector' in b or 'index' in b), None)
+                                if vector_bucket:
+                                    try:
+                                        obj = s3.head_object(Bucket=vector_bucket, Key="indices/my_vector_index.faiss")
+                                        st.markdown(f"""
+                                        <div class="metric-card">
+                                            <h3>FAISS Index Status</h3>
+                                            <div class="value">{obj['ContentLength']} bytes</div>
+                                        </div>
+                                        """, unsafe_allow_html=True)
+                                    except:
+                                        st.warning("FAISS index not yet available. Lambda may still be processing.")
+                            else:
+                                st.warning("**No Lambda ingestor deployed.** The document was uploaded to S3 successfully, but FAISS vectorization requires the Lambda function from `terraform apply` in `projects/01-secure-rag/`.")
+                                st.info("This demo proves the S3 data ingestion layer works. For the full RAG pipeline (embedding + retrieval), deploy the Terraform infrastructure.")
+                        except Exception as e:
+                            st.warning(f"Could not check Lambda status: {e}. Document upload to S3 succeeded.")
                     else:
                         st.error(f"No ingest bucket found. Available buckets: {', '.join(bucket_names)}")
                 except Exception as e:
