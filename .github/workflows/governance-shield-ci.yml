@@ -1,0 +1,59 @@
+name: "Deploy Governance Shield"
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'projects/03-governance-shield/**'
+  workflow_dispatch:
+    inputs:
+      fresh_lab:
+        description: 'Fresh Lab Mode (Ignores previous Terraform State)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  terraform:
+    name: "Terraform Apply Governance"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Terraform State
+        if: ${{ !inputs.fresh_lab }}
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: governance-shield-ci.yml
+          name: governance-terraform-state
+          path: projects/03-governance-shield/
+          if_no_artifact_found: warn
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init & Apply
+        run: |
+          cd projects/03-governance-shield
+          terraform init
+          terraform fmt
+          terraform apply -auto-approve
+
+      - name: Upload Terraform State
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-terraform-state
+          path: projects/03-governance-shield/terraform.tfstate
