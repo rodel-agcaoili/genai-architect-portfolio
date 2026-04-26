@@ -9,7 +9,21 @@ AWS provides excellent native orchestration pipelines (notably **Amazon Bedrock 
 
 Here is exactly why that distinction proves Principal-level reasoning:
 1. **Linear DAGs vs Cyclical Flow:** AWS Step Functions enforce rigid, linear Directed Acyclic Graphs (DAGs). This is structurally incompatible with true AI reasoning where an agent might need to try a tool, fail, route the state *backwards* to a previous agent for debugging context, and try again infinitely. LangGraph natively supports dynamic cyclical states computationally.
-2. **State Decoupling:** By keeping the state memory isolated in a native Python `TypedDict`, we guarantee zero-latency data traversal between LLM contexts natively, rather than passing JSON payloads through slow API Gateway layers.
+## The State Machine Architecture (Mermaid)
+By separating the agents into a strictly typed StateGraph, we visually decoupled their domains:
+
+```mermaid
+stateDiagram-v2
+    [*] --> TriageAgent: Incident Alert
+    
+    TriageAgent --> RunbookAgent: Known Standard Issue
+    TriageAgent --> EscalationAgent: Unknown Severe Anomaly
+    
+    RunbookAgent --> [*]: Vector Tool Found Fix
+    RunbookAgent --> EscalationAgent: Vector Tool Failed (Cyclical Re-route)
+    
+    EscalationAgent --> [*]: Generated Jira Draft
+```
 
 ## The Engineering Flow
 1. **The Triage Agent:** The entry-point API. It receives raw telemetry text. Through an internal heuristic prompt, it analyzes the incident constraint. If it's standard, it mathematically routes to Runbooks. If it's a catastrophic anomaly, it skips all steps and routes directly to Escalation.
