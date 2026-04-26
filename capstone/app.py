@@ -272,66 +272,95 @@ elif page == "1: Secure RAG":
         doc_text = st.text_area("Document Content", placeholder="Paste text content to ingest into the vector database...", height=150)
         filename = st.text_input("Filename", value="demo_document.txt")
         
-        if st.button("Upload to S3", type="primary"):
+        if st.button("Upload & Vectorize", type="primary"):
             if not st.session_state.aws_configured:
                 st.error("AWS credentials not configured. Go to AWS Credentials page first.")
             elif not doc_text:
                 st.error("Please enter document content.")
             else:
                 try:
+                    import numpy as np
+                    import faiss
+                    import tempfile
+                    
                     s3 = get_s3_client()
                     buckets = s3.list_buckets()['Buckets']
                     bucket_names = [b['Name'] for b in buckets]
-                    st.caption(f"Discovered {len(bucket_names)} buckets: {', '.join(bucket_names[:5])}{'...' if len(bucket_names) > 5 else ''}")
+                    st.caption(f"Discovered {len(bucket_names)} buckets: {', '.join(bucket_names[:5])}")
                     
                     ingest_bucket = next((b for b in bucket_names if 'ingest' in b or 'data' in b or 'landing' in b or 'rag' in b), None)
+                    vector_bucket = next((b for b in bucket_names if 'vector' in b or 'store' in b), None)
                     
-                    if ingest_bucket:
+                    if not ingest_bucket or not vector_bucket:
+                        st.error(f"Missing buckets. Click **Hydrate RAG Infrastructure** first. Found: {', '.join(bucket_names)}")
+                    else:
+                        # Step 1: Upload document to ingest bucket
                         s3.put_object(Bucket=ingest_bucket, Key=filename, Body=doc_text.encode('utf-8'))
-                        st.success(f"Uploaded `{filename}` to `{ingest_bucket}`")
+                        st.success(f"**Step 1/3** — Uploaded `{filename}` to `{ingest_bucket}`")
                         
-                        # Verify the document landed
-                        try:
-                            doc_obj = s3.head_object(Bucket=ingest_bucket, Key=filename)
+                        # Step 2: Generate embedding via Bedrock Titan
+                        with st.spinner("Step 2/3 — Generating embedding via Bedrock Titan..."):
+                            bedrock = get_bedrock_client()
+                            response = bedrock.invoke_model(
+                                modelId="amazon.titan-embed-text-v2:0",
+                                contentType="application/json",
+                                accept="application/json",
+                                body=json.dumps({"inputText": doc_text})
+                            )
+                            embedding = json.loads(response['body'].read())['embedding']
+                        
+                        dim = len(embedding)
+                        vector_np = np.array([embedding]).astype('float32')
+                        st.success(f"**Step 2/3** — Titan generated {dim}-dimensional embedding vector")
+                        
+                        # Step 3: Idempotent FAISS index update
+                        with st.spinner("Step 3/3 — Compiling FAISS vector index..."):
+                            INDEX_KEY = "indices/my_vector_index.faiss"
+                            index = None
+                            
+                            # Try to download existing index (idempotent append)
+                            try:
+                                with tempfile.NamedTemporaryFile(suffix=".faiss", delete=False) as tmp:
+                                    s3.download_file(vector_bucket, INDEX_KEY, tmp.name)
+                                    index = faiss.read_index(tmp.name)
+                                    st.caption(f"Anchored to existing FAISS index ({index.ntotal} vectors)")
+                            except:
+                                index = faiss.IndexFlatL2(dim)
+                                st.caption("No existing index — creating fresh FAISS database")
+                            
+                            # Append new vector
+                            index.add(vector_np)
+                            
+                            # Write back to S3
+                            with tempfile.NamedTemporaryFile(suffix=".faiss", delete=False) as tmp:
+                                faiss.write_index(index, tmp.name)
+                                s3.upload_file(tmp.name, vector_bucket, INDEX_KEY)
+                        
+                        st.success(f"**Step 3/3** — FAISS index synced to `s3://{vector_bucket}/{INDEX_KEY}`")
+                        
+                        # Summary metrics
+                        col_a, col_b, col_c = st.columns(3)
+                        with col_a:
                             st.markdown(f"""
                             <div class="metric-card">
-                                <h3>Document Uploaded</h3>
-                                <div class="value">{doc_obj['ContentLength']} bytes</div>
+                                <h3>Document Size</h3>
+                                <div class="value">{len(doc_text.encode('utf-8'))} bytes</div>
                             </div>
                             """, unsafe_allow_html=True)
-                        except:
-                            pass
-                        
-                        # Check if Lambda ingestor exists
-                        try:
-                            lambda_cl = boto3.client('lambda', **_creds_kwargs())
-                            fns = lambda_cl.list_functions()['Functions']
-                            ingest_fn = next((f['FunctionName'] for f in fns if 'ingest' in f['FunctionName'].lower()), None)
-                            
-                            if ingest_fn:
-                                st.info(f"Lambda ingestor detected: `{ingest_fn}`. Waiting for FAISS processing...")
-                                with st.spinner("Waiting for Lambda ingestion (10s)..."):
-                                    time.sleep(10)
-                                
-                                vector_bucket = next((b for b in bucket_names if 'vector' in b or 'index' in b), None)
-                                if vector_bucket:
-                                    try:
-                                        obj = s3.head_object(Bucket=vector_bucket, Key="indices/my_vector_index.faiss")
-                                        st.markdown(f"""
-                                        <div class="metric-card">
-                                            <h3>FAISS Index Status</h3>
-                                            <div class="value">{obj['ContentLength']} bytes</div>
-                                        </div>
-                                        """, unsafe_allow_html=True)
-                                    except:
-                                        st.warning("FAISS index not yet available. Lambda may still be processing.")
-                            else:
-                                st.warning("**No Lambda ingestor deployed.** The document was uploaded to S3 successfully, but FAISS vectorization requires the Lambda function from `terraform apply` in `projects/01-secure-rag/`.")
-                                st.info("This demo proves the S3 data ingestion layer works. For the full RAG pipeline (embedding + retrieval), deploy the Terraform infrastructure.")
-                        except Exception as e:
-                            st.warning(f"Could not check Lambda status: {e}. Document upload to S3 succeeded.")
-                    else:
-                        st.error(f"No ingest bucket found. Available buckets: {', '.join(bucket_names)}")
+                        with col_b:
+                            st.markdown(f"""
+                            <div class="metric-card">
+                                <h3>Embedding Dims</h3>
+                                <div class="value">{dim}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        with col_c:
+                            st.markdown(f"""
+                            <div class="metric-card">
+                                <h3>Total Vectors</h3>
+                                <div class="value">{index.ntotal}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
     
