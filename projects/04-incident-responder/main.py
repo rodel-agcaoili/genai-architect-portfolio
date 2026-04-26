@@ -3,7 +3,7 @@ from langgraph.graph import StateGraph, END
 import json
 import boto3
 
-# 1. GRAPH STATE DEFINITION
+# GRAPH STATE DEFINITION
 # This TypedDict defines the explicit memory shared across all autonomous agents in the loop.
 # This structure proves why LangGraph operates better than stateless step functions.
 class IncidentState(TypedDict):
@@ -29,11 +29,11 @@ def invoke_bedrock(prompt, system):
         return f"ERROR: {str(e)}"
 
 # -------------------------------------------------------------------------
-# 2. AGENT DEFINITIONS (Nodes)
+# AGENT DEFINITIONS (Nodes)
 # -------------------------------------------------------------------------
 
 def triage_agent(state: IncidentState):
-    print("\n🤖 [Triage Agent]: Analyzing incident severity telemetry...")
+    print("\n[Triage Agent]: Analyzing incident severity telemetry...")
     system = """You are an autonomous incident router. Read the user's server error. 
     If it is a predictable generic timeout, 500 error, or basic gateway failure, output exclusively the word: KNOWN. 
     If it is abstract, unique, undocumented, or mentions kernel panics/memory leaks, output exclusively the word: UNKNOWN."""
@@ -41,16 +41,18 @@ def triage_agent(state: IncidentState):
     decision = invoke_bedrock(state['incident'], system).strip().upper()
     
     # We strictly enforce the output string to control the graph state edge
-    if "KNOWN" in decision:
+    if "UNKNOWN" in decision:
+        state['route_decision'] = "UNKNOWN"
+    elif "KNOWN" in decision:
         state['route_decision'] = "KNOWN"
     else:
-        state['route_decision'] = "UNKNOWN"
+        state['route_decision'] = "UNKNOWN"  # Safe fallback escalates
         
     print(f"   -> Decision Matrix concluded: {state['route_decision']}")
     return state
 
 def runbook_agent(state: IncidentState):
-    print("📚 [Runbook Agent]: Executing VectorDB_Search tool across corporate databases...")
+    print("[Runbook Agent]: Executing VectorDB_Search tool across corporate databases...")
     
     # Simulating the action of hitting an organizational Vector Runbook
     if "KNOWN" in state['route_decision']:
@@ -65,7 +67,7 @@ def runbook_agent(state: IncidentState):
     return state
 
 def escalation_agent(state: IncidentState):
-    print("🚨 [Escalation Agent]: Executing create_jira_ticket API tool...")
+    print("[Escalation Agent]: Executing create_jira_ticket API tool...")
     system = """You are an automated Jira engineering bot. Draft a brief, 3-sentence P1 Jira Ticket detailing the user's incident. 
     Explicitly detail that the autonomous Runbook sweep was executed by the L1 Agents but completely failed."""
     
@@ -75,7 +77,7 @@ def escalation_agent(state: IncidentState):
     return state
 
 # -------------------------------------------------------------------------
-# 3. MULTI-AGENT STATE GRAPH ORCHESTRATION (The Decoupled Routing)
+# MULTI-AGENT STATE GRAPH ORCHESTRATION (Decoupled Routing)
 # -------------------------------------------------------------------------
 
 def route_from_triage(state: IncidentState):
@@ -110,7 +112,7 @@ app = workflow.compile()
 
 def simulate_incident(incident_text):
     print(f"\n=============================================")
-    print(f"🔥 INCOMING ALERT: {incident_text}")
+    print(f"INCOMING ALERT: {incident_text}")
     print(f"=============================================")
     # Fire the LangGraph pipeline
     app.invoke({"incident": incident_text, "route_decision": "", "resolution": ""})
