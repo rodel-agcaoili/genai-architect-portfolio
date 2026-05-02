@@ -1,0 +1,133 @@
+{
+  "name": "Rodel Agcaoili",
+  "title": "Senior Cloud Engineer & GenAI Architect",
+  "tagline": "Building enterprise-grade AI architectures on AWS — from secure RAG pipelines to autonomous security agents",
+  "about": "I'm a Senior Cloud Engineer specializing in AI Infrastructure and MLSecOps. I design and deploy production GenAI systems on AWS using services like Bedrock, Lambda, and Step Functions, all automated through Terraform. I'm currently building BantAI, a privacy-first multi-agent AI security framework. My work sits at the intersection of cloud architecture, generative AI, and security — where I focus on making AI systems that are not just intelligent, but safe and governable.",
+  "skills": {
+    "AI & GenAI": ["Amazon Bedrock", "Claude 3.5 / Haiku", "Titan Embeddings", "LangGraph", "FAISS", "RAG Pipelines", "LLM-as-a-Judge", "Prompt Engineering", "Gemini API", "Machine Learning", "NLP"],
+    "Cloud & Infrastructure": ["AWS", "Terraform", "Lambda", "S3", "Step Functions", "ECS", "CloudFormation", "IAM", "STS"],
+    "Security & Governance": ["MLSecOps", "PII Redaction", "Bedrock Guardrails", "Cedar Policies", "Public Access Block Enforcement", "Defense-in-Depth"],
+    "DevOps & Automation": ["GitHub Actions", "CI/CD Pipelines", "Docker", "Infrastructure as Code", "Automated Testing"]
+  },
+  "certifications": [
+    "AWS Certified Solutions Architect – Professional",
+    "AWS Certified Security – Specialty",
+    "AWS Certified Advanced Networking – Specialty"
+  ],
+  "experience": [
+    {
+      "role": "Senior Cloud Engineer, GSIRT Security Infrastructure",
+      "company": "Sony",
+      "period": "May 2018 - Present",
+      "highlights": [
+        "Engineering and implementation of security infrastructure on AWS to enhance company's security posture.",
+        "Engineered and built high-bandwidth data-pipelines for log ingestion.",
+        "Leveraged tools such as Terraform, GitLab, SaltStack to create a robust and scalable automated environment for Infrastructure as Code (IaC).",
+        "Developed Python code for AWS Lambda functions and AWS EventHub to create automated event driven solutions.",
+        "Introduced automated compliance checks, by developing code written with AWS SDK Boto3 in adherence to industry standards and regulations such as CIS Benchmarks."
+      ]
+    },
+    {
+      "role": "Interim Service Delivery Manager",
+      "company": "Sony",
+      "period": "Concurrent",
+      "highlights": [
+        "Acted as technical lead for perimeter network security projects, overseeing a team of four engineers.",
+        "Served as the Product/Process Owner, leading the transformation of build operations for Security Products."
+      ]
+    },
+    {
+      "role": "Sr Splunk Engineer",
+      "company": "Sony",
+      "period": "Concurrent",
+      "highlights": [
+        "Leveraged Splunk SDK with Python and bash scripts to automate the creation/correction of timezones into SIEM feeds.",
+        "Developed Python code for Machine Learning/Natural Language Processing (NLP) to learn and automate unknown indexes and source types."
+      ]
+    },
+    {
+      "role": "Python Automation Course Instructor",
+      "company": "Yellowtail.tech",
+      "period": "May 2022 - Present",
+      "highlights": [
+        "Main Instructor for Python Automation course.",
+        "Taught AWS SDK Boto3 and how to use APIs with Python.",
+        "Developed hands-on labs to reinforce learning."
+      ]
+    },
+    {
+      "role": "IT Security Engineer",
+      "company": "PenFed Credit Union",
+      "period": "April 2015 - May 2018",
+      "highlights": [
+        "Responsible for the engineering, design, implementation, maintenance, analysis, and administration of PenFed security tools.",
+        "Automated routine day-to-day tasks to reduce operational overhead.",
+        "Participated in assessment of compliance with security regulations such as PCI, GLBA, FFIEC."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Master of Science - MS, Computer Science, Machine Learning",
+      "school": "Georgia Institute of Technology",
+      "year": "January 2025"
+    },
+    {
+      "degree": "Bachelor’s Degree, Information Technology - Security",
+      "school": "Western Governors University",
+      "year": "2016"
+    }
+  ],
+  "links": {
+    "linkedin": "https://linkedin.com/in/rodel-agcaoili",
+    "github": "https://github.com/rodel-agcaoili/genai-architect-portfolio",
+    "email": "rodelagcaoili@gmail.com"
+  },
+  "projects_summary": [
+    {
+      "id": "secure-rag",
+      "number": 1,
+      "name": "Secure RAG Pipeline",
+      "subtitle": "Serverless FAISS Ingestion + Bedrock Titan Embeddings",
+      "tech": ["AWS Lambda", "Amazon Bedrock Titan", "FAISS", "S3", "Terraform"],
+      "description": "A fully serverless RAG ingestion pipeline. Documents uploaded to S3 trigger a Lambda that generates vector embeddings via Bedrock Titan, stores them in a FAISS index, and enables semantic search queries against the corpus. Features idempotent vector insertion and decoupled S3 design.",
+      "github_path": "projects/01-secure-rag"
+    },
+    {
+      "id": "sentinel-ai",
+      "number": 2,
+      "name": "SentinelAI",
+      "subtitle": "Autonomous S3 Security Remediation Agent",
+      "tech": ["Amazon Bedrock Agents", "AWS Lambda", "OpenAPI", "S3", "Terraform"],
+      "description": "A fully autonomous security loop using AWS Bedrock Agents. The agent interprets corporate security policies, translates them into OpenAPI workflows, and orchestrates executable AWS SDK commands via Lambda. Features Human-in-the-Loop governance and zero-trust idempotency.",
+      "github_path": "projects/02-sentinel-ai"
+    },
+    {
+      "id": "governance-shield",
+      "number": 3,
+      "name": "Governance Shield",
+      "subtitle": "Defense-in-Depth PII Scrubbing + LLM Guardrails",
+      "tech": ["AWS Lambda", "Amazon Bedrock Guardrails", "Python Regex", "Terraform"],
+      "description": "A dual-layered Defense-in-Depth security proxy. The Outer Boundary uses deterministic Regex to scrub PII (SSNs, credit cards, codenames) before transmission. The Inner Boundary uses LLM System Instructions to block prompt injection, hate speech, and denied topics. Guarantees data sovereignty prior to external invocation.",
+      "github_path": "projects/03-governance-shield"
+    },
+    {
+      "id": "incident-responder",
+      "number": 4,
+      "name": "Incident Responder",
+      "subtitle": "LangGraph Multi-Agent State Machine",
+      "tech": ["LangGraph", "Amazon Bedrock Claude", "Python", "State Machines"],
+      "description": "A multi-agent state machine built with LangGraph. Three specialized agents communicate over shared state: a Triage Agent classifies incidents, a Runbook Agent searches for fixes, and an Escalation Agent drafts Jira tickets. Supports cyclical re-routing — if Runbook fails, it autonomously routes to Escalation.",
+      "github_path": "projects/04-incident-responder"
+    },
+    {
+      "id": "drift-evaluator",
+      "number": 5,
+      "name": "Drift Evaluator",
+      "subtitle": "Native LLM-as-a-Judge MLOps Pipeline",
+      "tech": ["Amazon Bedrock Claude Haiku", "RAGAS Metrics", "Python boto3"],
+      "description": "Solves the 'Black Box' problem in production GenAI. Built from scratch using native boto3 (no RAGAS SDK dependency). Claude Haiku acts as a strict grader, scoring RAG outputs on Faithfulness and Relevancy. Integrates as an automated CI/CD quality gate.",
+      "github_path": "projects/05-drift-evaluator"
+    }
+  ]
+}
