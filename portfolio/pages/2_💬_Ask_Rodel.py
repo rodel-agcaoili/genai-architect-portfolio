@@ -68,13 +68,20 @@ if hasattr(st.session_state, "_pq"):
     q = st.session_state._pq
     del st.session_state._pq
     with st.chat_message("assistant"):
-        with st.spinner("Searching profile and projects..."):
-            ctx = query_rag(q, api_key, k=5)
-        with st.spinner("Thinking..."):
-            resp = generate_response(q, ctx, api_key, st.session_state.chat_messages[:-1])
-        st.markdown(resp)
-    st.session_state.chat_messages.append({"role": "assistant", "content": resp})
-    st.rerun()
+        try:
+            with st.spinner("Searching profile and projects..."):
+                ctx = query_rag(q, api_key, k=5)
+            with st.spinner("Thinking..."):
+                resp = generate_response(q, ctx, api_key, st.session_state.chat_messages[:-1])
+            st.markdown(resp)
+            st.session_state.chat_messages.append({"role": "assistant", "content": resp})
+            st.rerun()
+        except Exception as e:
+            st.error(f"Something went wrong while generating a response. Check the Debug info below.")
+            with st.expander("🛠️ Debug Info (Suggested Question)", expanded=True):
+                st.code(str(e))
+                import traceback
+                st.code(traceback.format_exc())
 
 # Chat input
 if prompt := st.chat_input("Ask about my experience, projects, or skills..."):
@@ -92,25 +99,25 @@ if prompt := st.chat_input("Ask about my experience, projects, or skills..."):
             st.session_state.chat_messages.append({"role": "assistant", "content": resp})
         except Exception as e:
             st.error(f"Something went wrong while generating a response. Check the Debug info below.")
-            with st.expander("🛠️ Debug Info", expanded=False):
-                st.markdown("### Available Models")
-                try:
-                    models = [m.name for m in genai.list_models()]
-                    st.write(models)
-                except Exception as me:
-                    st.write(f"Could not list models: {me}")
-                
-                st.markdown("### Traceback")
+            with st.expander("🛠️ Debug Info", expanded=True):
                 st.code(str(e))
                 import traceback
                 st.code(traceback.format_exc())
 
-
 # Sidebar
 with st.sidebar:
-
     st.markdown("### About This Chat")
     st.markdown("Powered by **Gemini 1.5 Flash** + **FAISS** vector search. Grounded in Rodel's profile data and 5 project READMEs. Never fabricates or exaggerates.")
+    
+    with st.expander("🛠️ Environment Debug", expanded=False):
+        st.markdown("### Available Models")
+        try:
+            models = [m.name for m in genai.list_models()]
+            st.write(models)
+        except Exception as me:
+            st.write(f"Could not list models: {me}")
+            
     if st.button("🗑️ Clear Chat"):
         st.session_state.chat_messages = [{"role": "assistant", "content": "Chat cleared! What would you like to know?"}]
         st.rerun()
+
