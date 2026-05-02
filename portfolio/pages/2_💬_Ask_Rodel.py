@@ -93,9 +93,18 @@ if prompt := st.chat_input("Ask about my experience, projects, or skills..."):
         except Exception as e:
             st.error(f"Something went wrong while generating a response. Check the Debug info below.")
             with st.expander("🛠️ Debug Info", expanded=False):
+                st.markdown("### Available Models")
+                try:
+                    models = [m.name for m in genai.list_models()]
+                    st.write(models)
+                except Exception as me:
+                    st.write(f"Could not list models: {me}")
+                
+                st.markdown("### Traceback")
                 st.code(str(e))
                 import traceback
                 st.code(traceback.format_exc())
+
 
 # Sidebar
 with st.sidebar:
