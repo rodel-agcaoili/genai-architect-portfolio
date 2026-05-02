@@ -219,7 +219,7 @@ def query_rag(question, api_key, k=5):
 def generate_response(question, context, api_key, chat_history=None):
     """Generate a response using Gemini with RAG context."""
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.5-flash")
 
     # Build the prompt with context
     prompt = f"""CONTEXT FROM MY PROFILE AND PROJECTS:
