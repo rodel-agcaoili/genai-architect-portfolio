@@ -247,7 +247,7 @@ Respond as Rodel Agcaoili following the system instructions."""
             f"{SYSTEM_PROMPT}\n\n{prompt}",
             generation_config=genai.types.GenerationConfig(
                 temperature=0.7,
-                max_output_tokens=500,
+                max_output_tokens=1000,
             )
         )
         return response.text
