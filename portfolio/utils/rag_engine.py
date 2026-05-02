@@ -219,7 +219,7 @@ def query_rag(question, api_key, k=5):
 def generate_response(question, context, api_key, chat_history=None):
     """Generate a response using Gemini with RAG context."""
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    model = genai.GenerativeModel("gemini-2.0-flash")
 
     # Build the prompt with context
     prompt = f"""CONTEXT FROM MY PROFILE AND PROJECTS:
@@ -247,9 +247,13 @@ Respond as Rodel Agcaoili following the system instructions."""
             f"{SYSTEM_PROMPT}\n\n{prompt}",
             generation_config=genai.types.GenerationConfig(
                 temperature=0.7,
-                max_output_tokens=1000,
+                max_output_tokens=4096,
             )
         )
-        return response.text
+        # Check if response actually has text
+        if response and response.candidates:
+            return response.text
+        return "I'm sorry, I generated an empty response. Please try rephrasing your question."
     except Exception as e:
         return f"I'm having trouble connecting right now. Please try again or reach out to me directly. (Error: {str(e)})"
+
