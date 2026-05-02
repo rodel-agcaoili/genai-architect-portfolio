@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import sys
+import google.generativeai as genai
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.rag_engine import GEMINI_AVAILABLE, query_rag, generate_response
