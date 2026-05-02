@@ -164,7 +164,7 @@ def _get_query_embedding(text, api_key):
 # RAG Engine (cached per session)
 # ---------------------------------------------------------------------------
 @st.cache_resource
-def build_rag_index(_api_key):
+def build_rag_index(_api_key, _version=2):
     """Build FAISS index from all knowledge sources. Cached for the session."""
     import faiss
 
@@ -196,7 +196,7 @@ def build_rag_index(_api_key):
 
 def query_rag(question, api_key, k=5):
     """Run a RAG query: embed question, search FAISS, return context chunks."""
-    index, chunks = build_rag_index(api_key)
+    index, chunks = build_rag_index(api_key, _version=2)
     if index is None or not chunks:
         return "I don't have enough context loaded to answer that question properly."
 
