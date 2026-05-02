@@ -35,3 +35,22 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# Streamlit secrets (NEVER commit)
+.streamlit/secrets.toml
+
+# Large binaries
+*.pkg
+AWSCLIV2.pkg
+
+# LinkedIn PDF (contains personal data)
+portfolio/data/linkedin_profile.pdf
+
+# macOS
+.DS_Store
