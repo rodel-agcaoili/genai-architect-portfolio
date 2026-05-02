@@ -81,18 +81,27 @@ if prompt := st.chat_input("Ask about my experience, projects, or skills..."):
     st.session_state.chat_messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
+    # Generate response
     with st.chat_message("assistant"):
-        with st.spinner("Searching profile and projects..."):
-            ctx = query_rag(prompt, api_key, k=5)
-        with st.spinner("Thinking..."):
-            resp = generate_response(prompt, ctx, api_key, st.session_state.chat_messages[:-1])
-        st.markdown(resp)
-    st.session_state.chat_messages.append({"role": "assistant", "content": resp})
+        try:
+            with st.spinner("Searching my profile and projects..."):
+                ctx = query_rag(prompt, api_key, k=5)
+            with st.spinner("Thinking..."):
+                resp = generate_response(prompt, ctx, api_key, st.session_state.chat_messages[:-1])
+            st.markdown(resp)
+            st.session_state.chat_messages.append({"role": "assistant", "content": resp})
+        except Exception as e:
+            st.error(f"Something went wrong while generating a response. Check the Debug info below.")
+            with st.expander("🛠️ Debug Info", expanded=False):
+                st.code(str(e))
+                import traceback
+                st.code(traceback.format_exc())
 
 # Sidebar
 with st.sidebar:
+
     st.markdown("### About This Chat")
-    st.markdown("Powered by **Gemini 2.0 Flash** + **FAISS** vector search. Grounded in Rodel's profile data and 5 project READMEs. Never fabricates or exaggerates.")
+    st.markdown("Powered by **Gemini 1.5 Flash** + **FAISS** vector search. Grounded in Rodel's profile data and 5 project READMEs. Never fabricates or exaggerates.")
     if st.button("🗑️ Clear Chat"):
         st.session_state.chat_messages = [{"role": "assistant", "content": "Chat cleared! What would you like to know?"}]
         st.rerun()
