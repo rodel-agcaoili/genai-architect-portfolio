@@ -24,18 +24,9 @@ except BaseException:
     pass
 if not api_key:
     api_key = os.environ.get("GEMINI_API_KEY")
-if not api_key:
-    api_key = st.session_state.get("gemini_api_key")
-
 
 if not api_key:
-    st.info("🔑 This chat is powered by Google Gemini. Enter your API key to start.")
-    st.markdown("Get a free key at [Google AI Studio](https://aistudio.google.com/apikey)")
-    key_input = st.text_input("Gemini API Key", type="password", key="gemini_key_input")
-    if st.button("Connect", type="primary"):
-        if key_input:
-            st.session_state.gemini_api_key = key_input
-            st.rerun()
+    st.error("🔑 API Key not found. Please set GEMINI_API_KEY in `.streamlit/secrets.toml` or environment.")
     st.stop()
 
 if not GEMINI_AVAILABLE:
@@ -108,7 +99,7 @@ if prompt := st.chat_input("Ask about my experience, projects, or skills..."):
 # Sidebar
 with st.sidebar:
     st.markdown("### About This Chat")
-    st.markdown("Powered by **Gemini 1.5 Flash** + **FAISS** vector search. Grounded in Rodel's profile data and 5 project READMEs. Never fabricates or exaggerates.")
+    st.markdown("Powered by **Gemini 1.5 Pro** + **FAISS** vector search. Grounded in Rodel's profile data and 5 project READMEs. Never fabricates or exaggerates.")
     
     with st.expander("🛠️ Environment Debug", expanded=False):
         st.markdown("### Available Models")

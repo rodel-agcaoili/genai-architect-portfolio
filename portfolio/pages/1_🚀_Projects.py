@@ -94,7 +94,7 @@ for proj in projects:
         if "jd_alignment" in proj:
             st.markdown(
                 f'<div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">'
-                f'<span style="background: linear-gradient(90deg, #4ade80, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; font-size: 0.8rem;">🎯 SIE JD ALIGNMENT:</span>'
+                f'<span style="background: linear-gradient(90deg, #4ade80, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; font-size: 0.8rem;">🎯 INDUSTRY ALIGNMENT:</span>'
                 f'<span style="color: #e0e0ff; font-weight: 600; font-size: 0.85rem; border-bottom: 1px dashed #4ade80;">{proj["jd_alignment"]}</span>'
                 f'</div>',
                 unsafe_allow_html=True
