@@ -188,7 +188,7 @@ if prompt := st.chat_input("Ask about my experience, projects, or skills..."):
 # Sidebar
 with st.sidebar:
     st.markdown("### About This Chat")
-    st.markdown("Powered by **Gemini 1.5 Pro** + **FAISS** vector search. Grounded in Rodel's profile data and 5 project READMEs. Never fabricates or exaggerates.")
+    st.markdown("Powered by **Gemini 2.0 Flash** + **FAISS** vector search. Grounded in Rodel's profile data and 5 project READMEs. Never fabricates or exaggerates.")
 
     st.divider()
 
