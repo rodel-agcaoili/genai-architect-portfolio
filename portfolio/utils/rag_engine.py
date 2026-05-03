@@ -233,6 +233,8 @@ def generate_response(question, context, api_key, chat_history=None):
         "gemini-2.0-flash",
         "gemini-2.0-flash-lite",
         "gemini-1.5-flash",
+        "gemini-1.0-pro",
+        "gemini-pro",
     ]
 
     # Build the prompt with context
