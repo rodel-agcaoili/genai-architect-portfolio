@@ -228,14 +228,25 @@ def generate_response(question, context, api_key, chat_history=None):
     """Generate a response using Gemini with RAG context and automatic model fallback."""
     genai.configure(api_key=api_key)
 
-    # Model fallback chain — if one model's quota is exhausted, try the next
-    MODEL_CHAIN = [
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
-        "gemini-1.5-flash",
-        "gemini-1.0-pro",
-        "gemini-pro",
-    ]
+    # Discover available models dynamically to avoid 404s on restricted accounts
+    MODEL_CHAIN = []
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                # Prefer flash or pro models, remove the models/ prefix if present
+                name = m.name.replace("models/", "")
+                if "vision" not in name and "embedding" not in name:
+                    MODEL_CHAIN.append(name)
+        
+        # Sort so we try newest/best ones first if they exist
+        MODEL_CHAIN.sort(key=lambda x: "2.0" in x or "1.5" in x, reverse=True)
+    except Exception:
+        # Fallback if list_models fails
+        MODEL_CHAIN = ["gemini-1.5-flash", "gemini-pro"]
+        
+    if not MODEL_CHAIN:
+        return "CRITICAL ERROR: Your API key does not have access to ANY text generation models. Please check your Google AI Studio permissions."
+
 
     # Build the prompt with context
     prompt = f"""CONTEXT FROM MY PROFILE AND PROJECTS:
