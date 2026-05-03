@@ -90,6 +90,73 @@ if hasattr(st.session_state, "_pq"):
                 import traceback
                 st.code(traceback.format_exc())
 
+# ---------------------------------------------------------------------------
+# Microphone Input (Web Speech API — runs in browser, zero cost)
+# ---------------------------------------------------------------------------
+if "voice_transcript" not in st.session_state:
+    st.session_state.voice_transcript = ""
+
+mic_col, status_col = st.columns([1, 5])
+with mic_col:
+    mic_clicked = st.button("🎤 Speak", use_container_width=True, type="primary")
+with status_col:
+    mic_placeholder = st.empty()
+
+if mic_clicked:
+    mic_placeholder.info("🎤 Listening... Speak now, then wait for transcription.")
+    # Inject Web Speech API JavaScript — transcribes in-browser and writes to a hidden div
+    st.components.v1.html("""
+    <div id="transcript-output" style="color: #e0e0ff; font-size: 0.9rem; padding: 0.5rem;"></div>
+    <script>
+        const output = document.getElementById('transcript-output');
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            output.innerHTML = '❌ Speech recognition not supported in this browser. Please use Chrome.';
+        } else {
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+            recognition.start();
+
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                output.innerHTML = '✅ Heard: <strong>' + transcript + '</strong>';
+                // Send transcript to Streamlit via query params
+                const url = new URL(window.parent.location);
+                url.searchParams.set('voice_query', transcript);
+                window.parent.history.replaceState({}, '', url);
+                // Trigger a rerun by clicking a hidden element
+                window.parent.postMessage({type: 'streamlit:setComponentValue', value: transcript}, '*');
+                // Fallback: reload after a short delay so Streamlit picks up the query param
+                setTimeout(() => { window.parent.location.reload(); }, 1500);
+            };
+
+            recognition.onerror = function(event) {
+                output.innerHTML = '❌ Error: ' + event.error + '. Please try again.';
+            };
+
+            recognition.onend = function() {
+                // If no result was captured
+                if (!output.innerHTML.includes('✅')) {
+                    output.innerHTML = '⏹️ No speech detected. Click 🎤 to try again.';
+                }
+            };
+        }
+    </script>
+    """, height=50)
+
+# Check for voice query from URL params
+voice_params = st.query_params
+if "voice_query" in voice_params:
+    voice_query = voice_params["voice_query"]
+    # Clear the param so it doesn't re-trigger
+    st.query_params.clear()
+    if voice_query.strip():
+        st.session_state.chat_messages.append({"role": "user", "content": voice_query})
+        st.session_state._pq = voice_query
+        st.rerun()
+
 # Chat input
 if prompt := st.chat_input("Ask about my experience, projects, or skills..."):
     st.session_state.chat_messages.append({"role": "user", "content": prompt})
