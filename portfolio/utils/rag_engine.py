@@ -71,17 +71,20 @@ def _load_documents():
         except Exception:
             continue
 
-    # Also try to load LinkedIn PDF if present
-    pdf_path = os.path.join(PORTFOLIO_DIR, "data", "linkedin_profile.pdf")
-    if os.path.exists(pdf_path):
-        try:
-            from PyPDF2 import PdfReader
-            reader = PdfReader(pdf_path)
-            text = "\n".join(page.extract_text() or "" for page in reader.pages)
-            if text.strip():
-                documents.append({"label": "linkedin", "content": text, "path": pdf_path})
-        except Exception:
-            pass
+    # Load all PDFs in the data directory
+    data_dir = os.path.join(PORTFOLIO_DIR, "data")
+    if os.path.exists(data_dir):
+        for file in os.listdir(data_dir):
+            if file.lower().endswith(".pdf"):
+                pdf_path = os.path.join(data_dir, file)
+                try:
+                    from PyPDF2 import PdfReader
+                    reader = PdfReader(pdf_path)
+                    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+                    if text.strip():
+                        documents.append({"label": f"pdf_{file}", "content": text, "path": pdf_path})
+                except Exception:
+                    pass
 
     return documents
 
@@ -164,7 +167,7 @@ def _get_query_embedding(text, api_key):
 # RAG Engine (cached per session)
 # ---------------------------------------------------------------------------
 @st.cache_resource
-def build_rag_index(_api_key, _version=2):
+def build_rag_index(_api_key, _version=3):
     """Build FAISS index from all knowledge sources. Cached for the session."""
     import faiss
 
@@ -196,7 +199,7 @@ def build_rag_index(_api_key, _version=2):
 
 def query_rag(question, api_key, k=5):
     """Run a RAG query: embed question, search FAISS, return context chunks."""
-    index, chunks = build_rag_index(api_key, _version=2)
+    index, chunks = build_rag_index(api_key, _version=3)
     if index is None or not chunks:
         return "I don't have enough context loaded to answer that question properly."
 

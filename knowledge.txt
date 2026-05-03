@@ -1,3 +1,15 @@
 Rodel Agcaoili is a Senior Cloud Engineer specializing in AI Infrastructure and MLSecOps. 
 He is currently building a privacy-first, multi-agent AI security framework called BantAI.
 His favorite tool for Infrastructure as Code is Terraform.
+
+OWASP Top 10 for Large Language Models (LLMs):
+1. Prompt Injections: Manipulating the LLM via crafted inputs.
+2. Insecure Output Handling: Failing to validate LLM outputs before downstream use.
+3. Training Data Poisoning: Tampering with the model's training data.
+4. Model Denial of Service: Overloading the LLM with resource-heavy requests.
+5. Supply Chain Vulnerabilities: Compromised third-party components or models.
+6. Sensitive Information Disclosure: LLMs leaking PII or confidential data.
+7. Insecure Plugin Design: Exploiting weak access controls in LLM plugins.
+8. Excessive Agency: Giving LLMs too much autonomy without human-in-the-loop.
+9. Overreliance: Blindly trusting LLM outputs leading to misconfigurations.
+10. Model Theft: Unauthorized access or exfiltration of proprietary models.
