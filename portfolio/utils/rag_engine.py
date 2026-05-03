@@ -227,11 +227,11 @@ def generate_response(question, context, api_key, chat_history=None):
     """Generate a response using Gemini with RAG context and automatic model fallback."""
     genai.configure(api_key=api_key)
 
-    # Model fallback chain — tries each in order until one works
+    # Model fallback chain — ordered by the models with active quota
+    # Check your quota at: https://aistudio.google.com/rate-limit
     MODEL_CHAIN = [
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
-        "gemini-1.5-flash",
+        "gemini-2.5-flash",       # Primary — 5 RPM, 20 RPD
+        "gemini-2.5-flash-lite",  # Fallback — 10 RPM, 20 RPD
     ]
 
     # Build the prompt with context
