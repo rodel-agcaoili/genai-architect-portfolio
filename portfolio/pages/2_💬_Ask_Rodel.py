@@ -9,6 +9,24 @@ from utils.voice_engine import get_voice_config, synthesize_speech, render_audio
 
 st.set_page_config(page_title="Ask Rodel — AI Chat", page_icon="💬", layout="wide")
 
+# Inject CSS to prevent layout shift during Streamlit reruns
+st.markdown("""
+<style>
+    /* Stabilize layout during reruns — prevent content jump */
+    [data-testid="stAppViewContainer"] {
+        min-height: 100vh;
+    }
+    /* Smooth transitions instead of hard flash */
+    .stChatMessage, .stMarkdown, .stButton {
+        animation: fadeIn 0.15s ease-in;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0.7; }
+        to { opacity: 1; }
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <div style="background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); padding: 2rem; border-radius: 12px; margin-bottom: 2rem; text-align: center;">
     <h1 style="color: #e0e0ff; margin: 0;">💬 Ask Rodel</h1>
@@ -57,7 +75,7 @@ def _handle_query(question):
             st.session_state.chat_messages.append({"role": "assistant", "content": resp})
 
             # Play voice inline — only for real responses, NOT errors
-            is_error = resp.startswith("I'm having trouble") or resp.startswith("I'm experiencing high demand")
+            is_error = resp.startswith("I'm having trouble")
             if st.session_state.voice_enabled and not is_error:
                 voice_result = synthesize_speech(resp)
                 render_audio_player(voice_result)
@@ -70,16 +88,28 @@ def _handle_query(question):
                 st.code(traceback.format_exc())
 
 # ---------------------------------------------------------------------------
-# Suggested questions — handled via st.chat_input style (no rerun)
+# Suggestion buttons inside a fragment to avoid full-page rerun
 # ---------------------------------------------------------------------------
-st.markdown("##### 💡 Try asking:")
-scols = st.columns(4)
-suggestions = ["What's your experience with AWS?", "Tell me about your RAG project", "What security projects have you built?", "How do you approach IaC?"]
-pending_suggestion = None
-for col, s in zip(scols, suggestions):
-    with col:
-        if st.button(s, key=f"s_{s[:15]}", use_container_width=True):
-            pending_suggestion = s
+@st.fragment
+def suggestion_buttons():
+    """Render suggestion buttons. Clicks only rerun this fragment, not the whole page."""
+    st.markdown("##### 💡 Try asking:")
+    scols = st.columns(4)
+    suggestions = [
+        "What's your experience with AWS?",
+        "Tell me about your RAG project",
+        "What security projects have you built?",
+        "How do you approach IaC?",
+    ]
+    for col, s in zip(scols, suggestions):
+        with col:
+            if st.button(s, key=f"s_{s[:15]}", use_container_width=True):
+                st.session_state.chat_messages.append({"role": "user", "content": s})
+                with st.chat_message("user"):
+                    st.markdown(s)
+                _handle_query(s)
+
+suggestion_buttons()
 
 st.divider()
 
@@ -88,97 +118,95 @@ for msg in st.session_state.chat_messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Handle suggestion click inline (no st.rerun!)
-if pending_suggestion:
-    st.session_state.chat_messages.append({"role": "user", "content": pending_suggestion})
-    with st.chat_message("user"):
-        st.markdown(pending_suggestion)
-    _handle_query(pending_suggestion)
-
 # ---------------------------------------------------------------------------
-# Microphone Input (Web Speech API — runs in browser, zero cost)
+# Microphone Input inside a fragment
 # ---------------------------------------------------------------------------
-mic_col, input_col = st.columns([1, 5])
-with mic_col:
-    mic_clicked = st.button("🎤 Speak", use_container_width=True, type="primary")
+@st.fragment
+def mic_input():
+    """Microphone input. Runs in its own fragment to avoid page flash."""
+    mic_col, _ = st.columns([1, 5])
+    with mic_col:
+        mic_clicked = st.button("🎤 Speak", use_container_width=True, type="primary")
 
-if mic_clicked:
-    st.components.v1.html("""
-    <div id="mic-status" style="
-        background: rgba(15,12,41,0.9); border: 1px solid #7c83ff;
-        border-radius: 8px; padding: 1rem; margin: 0.5rem 0;
-        font-family: 'Inter', sans-serif; color: #e0e0ff; font-size: 0.9rem;
-    ">
-        <div id="mic-text">🎤 Requesting microphone access...</div>
-        <div id="mic-hint" style="color: #a0a0d0; font-size: 0.75rem; margin-top: 0.3rem;">
-            If you see a permission prompt, click "Allow" to enable your microphone.
+    if mic_clicked:
+        st.components.v1.html("""
+        <div id="mic-status" style="
+            background: rgba(15,12,41,0.9); border: 1px solid #7c83ff;
+            border-radius: 8px; padding: 1rem; margin: 0.5rem 0;
+            font-family: 'Inter', sans-serif; color: #e0e0ff; font-size: 0.9rem;
+        ">
+            <div id="mic-text">🎤 Requesting microphone access...</div>
+            <div id="mic-hint" style="color: #a0a0d0; font-size: 0.75rem; margin-top: 0.3rem;">
+                If you see a permission prompt, click "Allow" to enable your microphone.
+            </div>
         </div>
-    </div>
-    <script>
-        const statusEl = document.getElementById('mic-text');
-        const hintEl = document.getElementById('mic-hint');
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        <script>
+            const statusEl = document.getElementById('mic-text');
+            const hintEl = document.getElementById('mic-hint');
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-        if (!SpeechRecognition) {
-            statusEl.innerHTML = '❌ Speech recognition not supported. Please use <strong>Chrome</strong> or <strong>Edge</strong>.';
-            hintEl.innerHTML = '';
-        } else {
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'en-US';
-            recognition.interimResults = true;
-            recognition.maxAlternatives = 1;
+            if (!SpeechRecognition) {
+                statusEl.innerHTML = '❌ Speech recognition not supported. Use <strong>Chrome</strong> or <strong>Edge</strong>.';
+                hintEl.innerHTML = '';
+            } else {
+                const recognition = new SpeechRecognition();
+                recognition.lang = 'en-US';
+                recognition.interimResults = true;
+                recognition.maxAlternatives = 1;
 
-            recognition.onstart = function() {
-                statusEl.innerHTML = '🔴 Listening... speak now.';
-                hintEl.innerHTML = 'I\\'ll stop listening when you pause.';
-            };
+                recognition.onstart = function() {
+                    statusEl.innerHTML = '🔴 Listening... speak now.';
+                    hintEl.innerHTML = 'I\\'ll stop listening when you pause.';
+                };
 
-            recognition.onresult = function(event) {
-                const transcript = event.results[0][0].transcript;
-                const isFinal = event.results[0].isFinal;
-                if (isFinal) {
-                    statusEl.innerHTML = '✅ Got it: <strong>' + transcript + '</strong>';
-                    hintEl.innerHTML = 'Submitting your question...';
-                    // Pass transcript via URL params to trigger Streamlit processing
-                    const url = new URL(window.parent.location);
-                    url.searchParams.set('voice_query', transcript);
-                    window.parent.history.replaceState({}, '', url);
-                    setTimeout(() => { window.parent.location.reload(); }, 800);
-                } else {
-                    statusEl.innerHTML = '🎤 Hearing: <em>' + transcript + '</em>...';
-                }
-            };
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript;
+                    const isFinal = event.results[0].isFinal;
+                    if (isFinal) {
+                        statusEl.innerHTML = '✅ Got it: <strong>' + transcript + '</strong>';
+                        hintEl.innerHTML = 'Submitting your question...';
+                        const url = new URL(window.parent.location);
+                        url.searchParams.set('voice_query', transcript);
+                        window.parent.history.replaceState({}, '', url);
+                        setTimeout(() => { window.parent.location.reload(); }, 800);
+                    } else {
+                        statusEl.innerHTML = '🎤 Hearing: <em>' + transcript + '</em>...';
+                    }
+                };
 
-            recognition.onerror = function(event) {
-                if (event.error === 'not-allowed') {
-                    statusEl.innerHTML = '🔒 Microphone access denied.';
-                    hintEl.innerHTML = 'Please allow microphone access in your browser settings, then click 🎤 again.';
-                } else if (event.error === 'no-speech') {
-                    statusEl.innerHTML = '⏹️ No speech detected.';
-                    hintEl.innerHTML = 'Click 🎤 Speak to try again.';
-                } else {
-                    statusEl.innerHTML = '❌ Error: ' + event.error;
-                    hintEl.innerHTML = 'Click 🎤 Speak to try again.';
-                }
-            };
+                recognition.onerror = function(event) {
+                    if (event.error === 'not-allowed') {
+                        statusEl.innerHTML = '🔒 Microphone access denied.';
+                        hintEl.innerHTML = 'Allow microphone in browser settings, then click 🎤 again.';
+                    } else if (event.error === 'no-speech') {
+                        statusEl.innerHTML = '⏹️ No speech detected.';
+                        hintEl.innerHTML = 'Click 🎤 Speak to try again.';
+                    } else {
+                        statusEl.innerHTML = '❌ Error: ' + event.error;
+                        hintEl.innerHTML = 'Click 🎤 Speak to try again.';
+                    }
+                };
 
-            recognition.onend = function() {
-                if (!statusEl.innerHTML.includes('✅') && !statusEl.innerHTML.includes('🔒') && !statusEl.innerHTML.includes('❌')) {
-                    statusEl.innerHTML = '⏹️ No speech detected.';
-                    hintEl.innerHTML = 'Click 🎤 Speak to try again.';
-                }
-            };
+                recognition.onend = function() {
+                    if (!statusEl.innerHTML.includes('✅') && !statusEl.innerHTML.includes('🔒') && !statusEl.innerHTML.includes('❌')) {
+                        statusEl.innerHTML = '⏹️ No speech detected.';
+                        hintEl.innerHTML = 'Click 🎤 Speak to try again.';
+                    }
+                };
 
-            recognition.start();
-        }
-    </script>
-    """, height=80)
+                recognition.start();
+            }
+        </script>
+        """, height=80)
 
-# Check for voice query from URL params — handle inline, single rerun only
+mic_input()
+
+# Check for voice query from URL params — handle inline
 voice_params = st.query_params
 if "voice_query" in voice_params:
     voice_query = voice_params["voice_query"]
-    st.query_params.clear()
+    # Clear without triggering extra rerun by using del
+    del st.query_params["voice_query"]
     if voice_query.strip():
         st.session_state.chat_messages.append({"role": "user", "content": voice_query})
         with st.chat_message("user"):
