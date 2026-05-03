@@ -61,19 +61,10 @@ for msg in st.session_state.chat_messages:
         st.markdown(msg["content"])
 
 # ---------------------------------------------------------------------------
-# Deferred voice playback — plays AFTER the page renders to avoid flash
-# ---------------------------------------------------------------------------
-if "_pending_voice_text" in st.session_state and st.session_state.voice_enabled:
-    text_to_speak = st.session_state._pending_voice_text
-    del st.session_state._pending_voice_text
-    voice_result = synthesize_speech(text_to_speak)
-    render_audio_player(voice_result)
-
-# ---------------------------------------------------------------------------
-# Helper: generate response and handle voice (no inline rerun)
+# Helper: generate response and handle voice (plays inline, no rerun)
 # ---------------------------------------------------------------------------
 def _handle_query(question):
-    """Generate a RAG response for the given question. Returns the response text."""
+    """Generate a RAG response for the given question."""
     with st.chat_message("assistant"):
         try:
             with st.spinner("Searching profile and projects..."):
@@ -83,11 +74,11 @@ def _handle_query(question):
             st.markdown(resp)
             st.session_state.chat_messages.append({"role": "assistant", "content": resp})
 
-            # Queue voice for deferred playback — only for real responses, NOT errors
+            # Play voice inline — only for real responses, NOT errors
             is_error = resp.startswith("I'm having trouble") or resp.startswith("I'm experiencing high demand")
             if st.session_state.voice_enabled and not is_error:
-                st.session_state._pending_voice_text = resp
-                st.rerun()
+                voice_result = synthesize_speech(resp)
+                render_audio_player(voice_result)
             elif is_error:
                 st.warning("⚠️ The AI is temporarily rate-limited. Please wait ~30 seconds and try again.")
 
