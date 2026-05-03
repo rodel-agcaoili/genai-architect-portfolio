@@ -141,7 +141,7 @@ def _get_embeddings(texts, api_key):
     for text in texts:
         try:
             result = genai.embed_content(
-                model="models/embedding-001",
+                model="models/gemini-embedding-001",
                 content=text,
                 task_type="retrieval_document"
             )
@@ -155,17 +155,12 @@ def _get_embeddings(texts, api_key):
 def _get_query_embedding(text, api_key):
     """Get a single query embedding."""
     genai.configure(api_key=api_key)
-    try:
-        result = genai.embed_content(
-            model="models/embedding-001",
-            content=text,
-            task_type="retrieval_query"
-        )
-        return np.array([result["embedding"]], dtype="float32")
-    except Exception as e:
-        # If the embedding fails (e.g. rate limit), return a dummy vector 
-        # so it doesn't crash the UI, but it won't return good context.
-        return np.array([[0.0] * 768], dtype="float32")
+    result = genai.embed_content(
+        model="models/gemini-embedding-001",
+        content=text,
+        task_type="retrieval_query"
+    )
+    return np.array([result["embedding"]], dtype="float32")
 
 
 # ---------------------------------------------------------------------------
@@ -225,28 +220,9 @@ def query_rag(question, api_key, k=5):
 
 
 def generate_response(question, context, api_key, chat_history=None):
-    """Generate a response using Gemini with RAG context and automatic model fallback."""
+    """Generate a response using Gemini with RAG context."""
     genai.configure(api_key=api_key)
-
-    # Discover available models dynamically to avoid 404s on restricted accounts
-    MODEL_CHAIN = []
-    try:
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                # Prefer flash or pro models, remove the models/ prefix if present
-                name = m.name.replace("models/", "")
-                if "vision" not in name and "embedding" not in name:
-                    MODEL_CHAIN.append(name)
-        
-        # Sort so we try newest/best ones first if they exist
-        MODEL_CHAIN.sort(key=lambda x: "2.0" in x or "1.5" in x, reverse=True)
-    except Exception:
-        # Fallback if list_models fails
-        MODEL_CHAIN = ["gemini-1.5-flash", "gemini-pro"]
-        
-    if not MODEL_CHAIN:
-        return "CRITICAL ERROR: Your API key does not have access to ANY text generation models. Please check your Google AI Studio permissions."
-
+    model = genai.GenerativeModel("gemini-2.0-flash")
 
     # Build the prompt with context
     prompt = f"""CONTEXT FROM MY PROFILE AND PROJECTS:
@@ -269,40 +245,27 @@ Respond as Rodel Agcaoili following the system instructions."""
     if history_text:
         prompt = f"CONVERSATION HISTORY:\n{history_text}\n\n{prompt}"
 
-    full_prompt = f"{SYSTEM_PROMPT}\n\n{prompt}"
-    gen_config = genai.types.GenerationConfig(
-        temperature=0.7,
-        max_output_tokens=2048,
-    )
+    try:
+        response = model.generate_content(
+            f"{SYSTEM_PROMPT}\n\n{prompt}",
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.7,
+                max_output_tokens=2048,
+            )
+        )
+        
+        if not response or not response.candidates:
+            return "I'm sorry, I generated an empty response."
 
-    last_error = None
-    for model_name in MODEL_CHAIN:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(full_prompt, generation_config=gen_config)
-
-            if not response or not response.candidates:
-                continue
-
-            text = response.text
-            finish_reason = response.candidates[0].finish_reason
-
-            # If it didn't finish normally, append a note for debugging
-            if finish_reason != 1:  # 1 is STOP
-                text += f"\n\n[Debug: Finish Reason: {finish_reason}]"
-
-            return text
-        except Exception as e:
-            last_error = e
-            error_str = str(e).lower()
-            # If quota/rate limit error, try the next model
-            if "429" in str(e) or "quota" in error_str or "rate" in error_str or "not found" in error_str:
-                continue
-            # Non-quota error — return immediately
-            return f"I'm having trouble connecting right now. Please try again in a moment. (Error: {str(e)})"
-
-    # All models exhausted
-    return f"I'm experiencing high demand right now. Please try again in about 30 seconds. (API Error: {str(last_error)})"
-
+        text = response.text
+        finish_reason = response.candidates[0].finish_reason
+        
+        # If it didn't finish normally, append a note for debugging
+        if finish_reason != 1:  # 1 is STOP
+            text += f"\n\n[Debug: Finish Reason: {finish_reason}]"
+            
+        return text
+    except Exception as e:
+        return f"I'm having trouble connecting right now. (Error: {str(e)})"
 
 
