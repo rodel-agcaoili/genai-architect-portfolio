@@ -42,26 +42,8 @@ if "voice_enabled" not in st.session_state:
 if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = [{"role": "assistant", "content": "Hey! I'm Rodel's AI — built to answer your questions about his skills, projects, and experience. Everything I say is grounded in his actual docs. What would you like to know?"}]
 
-# Suggested questions
-st.markdown("##### 💡 Try asking:")
-scols = st.columns(4)
-suggestions = ["What's your experience with AWS?", "Tell me about your RAG project", "What security projects have you built?", "How do you approach IaC?"]
-for col, s in zip(scols, suggestions):
-    with col:
-        if st.button(s, key=f"s_{s[:15]}", use_container_width=True):
-            st.session_state.chat_messages.append({"role": "user", "content": s})
-            st.session_state._pq = s
-            st.rerun()
-
-st.divider()
-
-# Display chat history
-for msg in st.session_state.chat_messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
 # ---------------------------------------------------------------------------
-# Helper: generate response and handle voice (plays inline, no rerun)
+# Helper: generate response and handle voice (plays inline, ZERO reruns)
 # ---------------------------------------------------------------------------
 def _handle_query(question):
     """Generate a RAG response for the given question."""
@@ -79,8 +61,6 @@ def _handle_query(question):
             if st.session_state.voice_enabled and not is_error:
                 voice_result = synthesize_speech(resp)
                 render_audio_player(voice_result)
-            elif is_error:
-                st.warning("⚠️ The AI is temporarily rate-limited. Please wait ~30 seconds and try again.")
 
         except Exception as e:
             st.error("Something went wrong. Please try again.")
@@ -89,11 +69,31 @@ def _handle_query(question):
                 import traceback
                 st.code(traceback.format_exc())
 
-# Handle pending suggestion
-if hasattr(st.session_state, "_pq"):
-    q = st.session_state._pq
-    del st.session_state._pq
-    _handle_query(q)
+# ---------------------------------------------------------------------------
+# Suggested questions — handled via st.chat_input style (no rerun)
+# ---------------------------------------------------------------------------
+st.markdown("##### 💡 Try asking:")
+scols = st.columns(4)
+suggestions = ["What's your experience with AWS?", "Tell me about your RAG project", "What security projects have you built?", "How do you approach IaC?"]
+pending_suggestion = None
+for col, s in zip(scols, suggestions):
+    with col:
+        if st.button(s, key=f"s_{s[:15]}", use_container_width=True):
+            pending_suggestion = s
+
+st.divider()
+
+# Display chat history
+for msg in st.session_state.chat_messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# Handle suggestion click inline (no st.rerun!)
+if pending_suggestion:
+    st.session_state.chat_messages.append({"role": "user", "content": pending_suggestion})
+    with st.chat_message("user"):
+        st.markdown(pending_suggestion)
+    _handle_query(pending_suggestion)
 
 # ---------------------------------------------------------------------------
 # Microphone Input (Web Speech API — runs in browser, zero cost)
@@ -139,11 +139,11 @@ if mic_clicked:
                 if (isFinal) {
                     statusEl.innerHTML = '✅ Got it: <strong>' + transcript + '</strong>';
                     hintEl.innerHTML = 'Submitting your question...';
-                    // Pass transcript via URL params and reload to trigger Streamlit
+                    // Pass transcript via URL params to trigger Streamlit processing
                     const url = new URL(window.parent.location);
                     url.searchParams.set('voice_query', transcript);
                     window.parent.history.replaceState({}, '', url);
-                    setTimeout(() => { window.parent.location.reload(); }, 1000);
+                    setTimeout(() => { window.parent.location.reload(); }, 800);
                 } else {
                     statusEl.innerHTML = '🎤 Hearing: <em>' + transcript + '</em>...';
                 }
@@ -163,7 +163,6 @@ if mic_clicked:
             };
 
             recognition.onend = function() {
-                // If no result was captured, show retry hint
                 if (!statusEl.innerHTML.includes('✅') && !statusEl.innerHTML.includes('🔒') && !statusEl.innerHTML.includes('❌')) {
                     statusEl.innerHTML = '⏹️ No speech detected.';
                     hintEl.innerHTML = 'Click 🎤 Speak to try again.';
@@ -175,15 +174,16 @@ if mic_clicked:
     </script>
     """, height=80)
 
-# Check for voice query from URL params
+# Check for voice query from URL params — handle inline, single rerun only
 voice_params = st.query_params
 if "voice_query" in voice_params:
     voice_query = voice_params["voice_query"]
     st.query_params.clear()
     if voice_query.strip():
         st.session_state.chat_messages.append({"role": "user", "content": voice_query})
-        st.session_state._pq = voice_query
-        st.rerun()
+        with st.chat_message("user"):
+            st.markdown(voice_query)
+        _handle_query(voice_query)
 
 # Text chat input (always available)
 if prompt := st.chat_input("Ask about my experience, projects, or skills..."):

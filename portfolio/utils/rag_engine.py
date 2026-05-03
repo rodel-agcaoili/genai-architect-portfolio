@@ -155,12 +155,16 @@ def _get_embeddings(texts, api_key):
 def _get_query_embedding(text, api_key):
     """Get a single query embedding."""
     genai.configure(api_key=api_key)
-    result = genai.embed_content(
-        model="models/gemini-embedding-001",
-        content=text,
-        task_type="retrieval_query"
-    )
-    return np.array([result["embedding"]], dtype="float32")
+    try:
+        result = genai.embed_content(
+            model="models/gemini-embedding-001",
+            content=text,
+            task_type="retrieval_query"
+        )
+        return np.array([result["embedding"]], dtype="float32")
+    except Exception:
+        # Return zero vector so the UI doesn't crash on embedding rate limits
+        return np.array([[0.0] * 768], dtype="float32")
 
 
 # ---------------------------------------------------------------------------
@@ -220,9 +224,15 @@ def query_rag(question, api_key, k=5):
 
 
 def generate_response(question, context, api_key, chat_history=None):
-    """Generate a response using Gemini with RAG context."""
+    """Generate a response using Gemini with RAG context and automatic model fallback."""
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+
+    # Model fallback chain — tries each in order until one works
+    MODEL_CHAIN = [
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash",
+    ]
 
     # Build the prompt with context
     prompt = f"""CONTEXT FROM MY PROFILE AND PROJECTS:
@@ -245,27 +255,35 @@ Respond as Rodel Agcaoili following the system instructions."""
     if history_text:
         prompt = f"CONVERSATION HISTORY:\n{history_text}\n\n{prompt}"
 
-    try:
-        response = model.generate_content(
-            f"{SYSTEM_PROMPT}\n\n{prompt}",
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.7,
-                max_output_tokens=2048,
-            )
-        )
-        
-        if not response or not response.candidates:
-            return "I'm sorry, I generated an empty response."
+    full_prompt = f"{SYSTEM_PROMPT}\n\n{prompt}"
+    gen_config = genai.types.GenerationConfig(
+        temperature=0.7,
+        max_output_tokens=2048,
+    )
 
-        text = response.text
-        finish_reason = response.candidates[0].finish_reason
-        
-        # If it didn't finish normally, append a note for debugging
-        if finish_reason != 1:  # 1 is STOP
-            text += f"\n\n[Debug: Finish Reason: {finish_reason}]"
-            
-        return text
-    except Exception as e:
-        return f"I'm having trouble connecting right now. (Error: {str(e)})"
+    last_error = None
+    for model_name in MODEL_CHAIN:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(full_prompt, generation_config=gen_config)
 
+            if not response or not response.candidates:
+                continue
+
+            text = response.text
+            finish_reason = response.candidates[0].finish_reason
+
+            if finish_reason != 1:  # 1 is STOP
+                text += f"\n\n[Debug: Finish Reason: {finish_reason}]"
+
+            return text
+        except Exception as e:
+            last_error = e
+            error_str = str(e).lower()
+            if "429" in str(e) or "quota" in error_str or "rate" in error_str or "not found" in error_str:
+                continue
+            return f"I'm having trouble connecting right now. (Error: {str(e)})"
+
+    # All models exhausted
+    return f"I'm having trouble connecting right now. (Error: {str(last_error)})"
 
