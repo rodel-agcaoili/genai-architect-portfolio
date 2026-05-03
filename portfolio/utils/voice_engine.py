@@ -190,8 +190,7 @@ def render_audio_player(result: Dict[str, Any]) -> None:
             unsafe_allow_html=True,
         )
     else:
-        # Browser TTS fallback — use Web Speech API
-        # Escape the text for safe JavaScript injection
+        # Browser TTS fallback — use Web Speech API with natural voice selection
         safe_text = (
             result["text"]
             .replace("\\", "\\\\")
@@ -207,16 +206,39 @@ def render_audio_player(result: Dict[str, Any]) -> None:
         st.components.v1.html(
             f"""
             <script>
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance('{safe_text}');
-                utterance.rate = 1.0;
-                utterance.pitch = 1.0;
-                utterance.volume = 1.0;
-                // Try to select a natural-sounding voice
-                const voices = window.speechSynthesis.getVoices();
-                const preferred = voices.find(v => v.name.includes('Daniel') || v.name.includes('Samantha'));
-                if (preferred) utterance.voice = preferred;
-                window.speechSynthesis.speak(utterance);
+                function speakText() {{
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance('{safe_text}');
+                    utterance.rate = 0.95;
+                    utterance.pitch = 1.0;
+                    utterance.volume = 1.0;
+
+                    // Select the most natural-sounding voice available
+                    const voices = window.speechSynthesis.getVoices();
+                    const preferredNames = [
+                        'Google US English',        // Chrome — very natural
+                        'Microsoft Mark Online',    // Edge — natural
+                        'Samantha',                 // macOS — good quality
+                        'Daniel',                   // macOS — good quality
+                        'Karen',                    // macOS — decent
+                        'Aaron',                    // macOS
+                        'Alex',                     // macOS legacy
+                    ];
+                    let selectedVoice = null;
+                    for (const name of preferredNames) {{
+                        selectedVoice = voices.find(v => v.name.includes(name));
+                        if (selectedVoice) break;
+                    }}
+                    if (selectedVoice) utterance.voice = selectedVoice;
+                    window.speechSynthesis.speak(utterance);
+                }}
+
+                // Voices load asynchronously in Chrome — wait for them
+                if (window.speechSynthesis.getVoices().length > 0) {{
+                    speakText();
+                }} else {{
+                    window.speechSynthesis.onvoiceschanged = speakText;
+                }}
             </script>
             """,
             height=0,

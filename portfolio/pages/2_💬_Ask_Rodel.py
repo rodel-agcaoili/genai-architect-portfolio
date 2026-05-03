@@ -19,7 +19,6 @@ st.markdown("""
 # API Key — check secrets, env, then session
 api_key = None
 try:
-    # st.secrets raises if no secrets.toml exists — guard with try/except
     api_key = st.secrets.get("GEMINI_API_KEY", None)
 except BaseException:
     pass
@@ -37,11 +36,9 @@ if not GEMINI_AVAILABLE:
 # Voice configuration
 voice_config = get_voice_config()
 
-# Initialize voice toggle in session state
+# Initialize session state
 if "voice_enabled" not in st.session_state:
     st.session_state.voice_enabled = True
-
-# Init chat history
 if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = [{"role": "assistant", "content": "Hey! I'm Rodel's AI — built to answer your questions about his skills, projects, and experience. Everything I say is grounded in his actual docs. What would you like to know?"}]
 
@@ -58,134 +55,155 @@ for col, s in zip(scols, suggestions):
 
 st.divider()
 
-# Display history
+# Display chat history
 for msg in st.session_state.chat_messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+
+# ---------------------------------------------------------------------------
+# Deferred voice playback — plays AFTER the page renders to avoid flash
+# ---------------------------------------------------------------------------
+if "_pending_voice_text" in st.session_state and st.session_state.voice_enabled:
+    text_to_speak = st.session_state._pending_voice_text
+    del st.session_state._pending_voice_text
+    voice_result = synthesize_speech(text_to_speak)
+    render_audio_player(voice_result)
+
+# ---------------------------------------------------------------------------
+# Helper: generate response and handle voice (no inline rerun)
+# ---------------------------------------------------------------------------
+def _handle_query(question):
+    """Generate a RAG response for the given question. Returns the response text."""
+    with st.chat_message("assistant"):
+        try:
+            with st.spinner("Searching profile and projects..."):
+                ctx = query_rag(question, api_key, k=5)
+            with st.spinner("Thinking..."):
+                resp = generate_response(question, ctx, api_key, st.session_state.chat_messages[:-1])
+            st.markdown(resp)
+            st.session_state.chat_messages.append({"role": "assistant", "content": resp})
+
+            # Queue voice for deferred playback — only for real responses, NOT errors
+            is_error = resp.startswith("I'm having trouble") or resp.startswith("I'm experiencing high demand")
+            if st.session_state.voice_enabled and not is_error:
+                st.session_state._pending_voice_text = resp
+                st.rerun()
+            elif is_error:
+                st.warning("⚠️ The AI is temporarily rate-limited. Please wait ~30 seconds and try again.")
+
+        except Exception as e:
+            st.error("Something went wrong. Please try again.")
+            with st.expander("🛠️ Debug Info", expanded=False):
+                st.code(str(e))
+                import traceback
+                st.code(traceback.format_exc())
 
 # Handle pending suggestion
 if hasattr(st.session_state, "_pq"):
     q = st.session_state._pq
     del st.session_state._pq
-    with st.chat_message("assistant"):
-        try:
-            with st.spinner("Searching profile and projects..."):
-                ctx = query_rag(q, api_key, k=5)
-            with st.spinner("Thinking..."):
-                resp = generate_response(q, ctx, api_key, st.session_state.chat_messages[:-1])
-            st.markdown(resp)
-            st.session_state.chat_messages.append({"role": "assistant", "content": resp})
-
-            # Voice response
-            if st.session_state.voice_enabled:
-                with st.spinner("🎙️ Generating voice..."):
-                    voice_result = synthesize_speech(resp)
-                render_audio_player(voice_result)
-
-            st.rerun()
-        except Exception as e:
-            st.error(f"Something went wrong while generating a response. Check the Debug info below.")
-            with st.expander("🛠️ Debug Info (Suggested Question)", expanded=True):
-                st.code(str(e))
-                import traceback
-                st.code(traceback.format_exc())
+    _handle_query(q)
 
 # ---------------------------------------------------------------------------
 # Microphone Input (Web Speech API — runs in browser, zero cost)
 # ---------------------------------------------------------------------------
-if "voice_transcript" not in st.session_state:
-    st.session_state.voice_transcript = ""
-
-mic_col, status_col = st.columns([1, 5])
+mic_col, input_col = st.columns([1, 5])
 with mic_col:
     mic_clicked = st.button("🎤 Speak", use_container_width=True, type="primary")
-with status_col:
-    mic_placeholder = st.empty()
 
 if mic_clicked:
-    mic_placeholder.info("🎤 Listening... Speak now, then wait for transcription.")
-    # Inject Web Speech API JavaScript — transcribes in-browser and writes to a hidden div
     st.components.v1.html("""
-    <div id="transcript-output" style="color: #e0e0ff; font-size: 0.9rem; padding: 0.5rem;"></div>
+    <div id="mic-status" style="
+        background: rgba(15,12,41,0.9); border: 1px solid #7c83ff;
+        border-radius: 8px; padding: 1rem; margin: 0.5rem 0;
+        font-family: 'Inter', sans-serif; color: #e0e0ff; font-size: 0.9rem;
+    ">
+        <div id="mic-text">🎤 Requesting microphone access...</div>
+        <div id="mic-hint" style="color: #a0a0d0; font-size: 0.75rem; margin-top: 0.3rem;">
+            If you see a permission prompt, click "Allow" to enable your microphone.
+        </div>
+    </div>
     <script>
-        const output = document.getElementById('transcript-output');
+        const statusEl = document.getElementById('mic-text');
+        const hintEl = document.getElementById('mic-hint');
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
         if (!SpeechRecognition) {
-            output.innerHTML = '❌ Speech recognition not supported in this browser. Please use Chrome.';
+            statusEl.innerHTML = '❌ Speech recognition not supported. Please use <strong>Chrome</strong> or <strong>Edge</strong>.';
+            hintEl.innerHTML = '';
         } else {
             const recognition = new SpeechRecognition();
             recognition.lang = 'en-US';
-            recognition.interimResults = false;
+            recognition.interimResults = true;
             recognition.maxAlternatives = 1;
-            recognition.start();
+
+            recognition.onstart = function() {
+                statusEl.innerHTML = '🔴 Listening... speak now.';
+                hintEl.innerHTML = 'I\\'ll stop listening when you pause.';
+            };
 
             recognition.onresult = function(event) {
                 const transcript = event.results[0][0].transcript;
-                output.innerHTML = '✅ Heard: <strong>' + transcript + '</strong>';
-                // Send transcript to Streamlit via query params
-                const url = new URL(window.parent.location);
-                url.searchParams.set('voice_query', transcript);
-                window.parent.history.replaceState({}, '', url);
-                // Trigger a rerun by clicking a hidden element
-                window.parent.postMessage({type: 'streamlit:setComponentValue', value: transcript}, '*');
-                // Fallback: reload after a short delay so Streamlit picks up the query param
-                setTimeout(() => { window.parent.location.reload(); }, 1500);
+                const isFinal = event.results[0].isFinal;
+                if (isFinal) {
+                    statusEl.innerHTML = '✅ Got it: <strong>' + transcript + '</strong>';
+                    hintEl.innerHTML = 'Submitting your question...';
+                    // Pass transcript via URL params and reload to trigger Streamlit
+                    const url = new URL(window.parent.location);
+                    url.searchParams.set('voice_query', transcript);
+                    window.parent.history.replaceState({}, '', url);
+                    setTimeout(() => { window.parent.location.reload(); }, 1000);
+                } else {
+                    statusEl.innerHTML = '🎤 Hearing: <em>' + transcript + '</em>...';
+                }
             };
 
             recognition.onerror = function(event) {
-                output.innerHTML = '❌ Error: ' + event.error + '. Please try again.';
+                if (event.error === 'not-allowed') {
+                    statusEl.innerHTML = '🔒 Microphone access denied.';
+                    hintEl.innerHTML = 'Please allow microphone access in your browser settings, then click 🎤 again.';
+                } else if (event.error === 'no-speech') {
+                    statusEl.innerHTML = '⏹️ No speech detected.';
+                    hintEl.innerHTML = 'Click 🎤 Speak to try again.';
+                } else {
+                    statusEl.innerHTML = '❌ Error: ' + event.error;
+                    hintEl.innerHTML = 'Click 🎤 Speak to try again.';
+                }
             };
 
             recognition.onend = function() {
-                // If no result was captured
-                if (!output.innerHTML.includes('✅')) {
-                    output.innerHTML = '⏹️ No speech detected. Click 🎤 to try again.';
+                // If no result was captured, show retry hint
+                if (!statusEl.innerHTML.includes('✅') && !statusEl.innerHTML.includes('🔒') && !statusEl.innerHTML.includes('❌')) {
+                    statusEl.innerHTML = '⏹️ No speech detected.';
+                    hintEl.innerHTML = 'Click 🎤 Speak to try again.';
                 }
             };
+
+            recognition.start();
         }
     </script>
-    """, height=50)
+    """, height=80)
 
 # Check for voice query from URL params
 voice_params = st.query_params
 if "voice_query" in voice_params:
     voice_query = voice_params["voice_query"]
-    # Clear the param so it doesn't re-trigger
     st.query_params.clear()
     if voice_query.strip():
         st.session_state.chat_messages.append({"role": "user", "content": voice_query})
         st.session_state._pq = voice_query
         st.rerun()
 
-# Chat input
+# Text chat input (always available)
 if prompt := st.chat_input("Ask about my experience, projects, or skills..."):
     st.session_state.chat_messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
-    # Generate response
-    with st.chat_message("assistant"):
-        try:
-            with st.spinner("Searching my profile and projects..."):
-                ctx = query_rag(prompt, api_key, k=5)
-            with st.spinner("Thinking..."):
-                resp = generate_response(prompt, ctx, api_key, st.session_state.chat_messages[:-1])
-            st.markdown(resp)
-            st.session_state.chat_messages.append({"role": "assistant", "content": resp})
+    _handle_query(prompt)
 
-            # Voice response
-            if st.session_state.voice_enabled:
-                with st.spinner("🎙️ Generating voice..."):
-                    voice_result = synthesize_speech(resp)
-                render_audio_player(voice_result)
-
-        except Exception as e:
-            st.error(f"Something went wrong while generating a response. Check the Debug info below.")
-            with st.expander("🛠️ Debug Info", expanded=True):
-                st.code(str(e))
-                import traceback
-                st.code(traceback.format_exc())
-
+# ---------------------------------------------------------------------------
 # Sidebar
+# ---------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("### About This Chat")
     st.markdown("Powered by **Gemini 2.0 Flash** + **FAISS** vector search. Grounded in Rodel's profile data and 5 project READMEs. Never fabricates or exaggerates.")

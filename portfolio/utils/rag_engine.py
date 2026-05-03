@@ -220,9 +220,15 @@ def query_rag(question, api_key, k=5):
 
 
 def generate_response(question, context, api_key, chat_history=None):
-    """Generate a response using Gemini with RAG context."""
+    """Generate a response using Gemini with RAG context and automatic model fallback."""
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+
+    # Model fallback chain — if one model's quota is exhausted, try the next
+    MODEL_CHAIN = [
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash",
+    ]
 
     # Build the prompt with context
     prompt = f"""CONTEXT FROM MY PROFILE AND PROJECTS:
@@ -245,27 +251,40 @@ Respond as Rodel Agcaoili following the system instructions."""
     if history_text:
         prompt = f"CONVERSATION HISTORY:\n{history_text}\n\n{prompt}"
 
-    try:
-        response = model.generate_content(
-            f"{SYSTEM_PROMPT}\n\n{prompt}",
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.7,
-                max_output_tokens=2048,
-            )
-        )
-        
-        if not response or not response.candidates:
-            return "I'm sorry, I generated an empty response."
+    full_prompt = f"{SYSTEM_PROMPT}\n\n{prompt}"
+    gen_config = genai.types.GenerationConfig(
+        temperature=0.7,
+        max_output_tokens=2048,
+    )
 
-        text = response.text
-        finish_reason = response.candidates[0].finish_reason
-        
-        # If it didn't finish normally, append a note for debugging
-        if finish_reason != 1:  # 1 is STOP
-            text += f"\n\n[Debug: Finish Reason: {finish_reason}]"
-            
-        return text
-    except Exception as e:
-        return f"I'm having trouble connecting right now. (Error: {str(e)})"
+    last_error = None
+    for model_name in MODEL_CHAIN:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(full_prompt, generation_config=gen_config)
+
+            if not response or not response.candidates:
+                continue
+
+            text = response.text
+            finish_reason = response.candidates[0].finish_reason
+
+            # If it didn't finish normally, append a note for debugging
+            if finish_reason != 1:  # 1 is STOP
+                text += f"\n\n[Debug: Finish Reason: {finish_reason}]"
+
+            return text
+        except Exception as e:
+            last_error = e
+            error_str = str(e).lower()
+            # If quota/rate limit error, try the next model
+            if "429" in str(e) or "quota" in error_str or "rate" in error_str or "not found" in error_str:
+                continue
+            # Non-quota error — return immediately
+            return f"I'm having trouble connecting right now. Please try again in a moment."
+
+    # All models exhausted
+    return "I'm experiencing high demand right now. Please try again in about 30 seconds."
+
 
 
