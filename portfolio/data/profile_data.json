@@ -90,6 +90,7 @@
       "name": "Secure RAG Pipeline",
       "subtitle": "Serverless FAISS Ingestion + Bedrock Titan Embeddings",
       "tech": ["AWS Lambda", "Amazon Bedrock Titan", "FAISS", "S3", "Terraform"],
+      "jd_alignment": "DSPM (Data Security Posture Management)",
       "description": "A fully serverless RAG ingestion pipeline. Documents uploaded to S3 trigger a Lambda that generates vector embeddings via Bedrock Titan, stores them in a FAISS index, and enables semantic search queries against the corpus. Features idempotent vector insertion and decoupled S3 design.",
       "github_path": "projects/01-secure-rag"
     },
@@ -99,6 +100,7 @@
       "name": "SentinelAI",
       "subtitle": "Autonomous S3 Security Remediation Agent",
       "tech": ["Amazon Bedrock Agents", "AWS Lambda", "OpenAPI", "S3", "Terraform"],
+      "jd_alignment": "CNAPP / CSPM",
       "description": "A fully autonomous security loop using AWS Bedrock Agents. The agent interprets corporate security policies, translates them into OpenAPI workflows, and orchestrates executable AWS SDK commands via Lambda. Features Human-in-the-Loop governance and zero-trust idempotency.",
       "github_path": "projects/02-sentinel-ai"
     },
@@ -108,6 +110,7 @@
       "name": "Governance Shield",
       "subtitle": "Defense-in-Depth PII Scrubbing + LLM Guardrails",
       "tech": ["AWS Lambda", "Amazon Bedrock Guardrails", "Python Regex", "Terraform"],
+      "jd_alignment": "OWASP Top 10 for LLMs (Prompt Injections)",
       "description": "A dual-layered Defense-in-Depth security proxy. The Outer Boundary uses deterministic Regex to scrub PII (SSNs, credit cards, codenames) before transmission. The Inner Boundary uses LLM System Instructions to block prompt injection, hate speech, and denied topics. Guarantees data sovereignty prior to external invocation.",
       "github_path": "projects/03-governance-shield"
     },
@@ -117,6 +120,7 @@
       "name": "Incident Responder",
       "subtitle": "LangGraph Multi-Agent State Machine",
       "tech": ["LangGraph", "Amazon Bedrock Claude", "Python", "State Machines"],
+      "jd_alignment": "SOAR / Automated Remediation",
       "description": "A multi-agent state machine built with LangGraph. Three specialized agents communicate over shared state: a Triage Agent classifies incidents, a Runbook Agent searches for fixes, and an Escalation Agent drafts Jira tickets. Supports cyclical re-routing — if Runbook fails, it autonomously routes to Escalation.",
       "github_path": "projects/04-incident-responder"
     },
@@ -126,6 +130,7 @@
       "name": "Drift Evaluator",
       "subtitle": "Native LLM-as-a-Judge MLOps Pipeline",
       "tech": ["Amazon Bedrock Claude Haiku", "RAGAS Metrics", "Python boto3"],
+      "jd_alignment": "AI/ML Continuous Monitoring",
       "description": "Solves the 'Black Box' problem in production GenAI. Built from scratch using native boto3 (no RAGAS SDK dependency). Claude Haiku acts as a strict grader, scoring RAG outputs on Faithfulness and Relevancy. Integrates as an automated CI/CD quality gate.",
       "github_path": "projects/05-drift-evaluator"
     }

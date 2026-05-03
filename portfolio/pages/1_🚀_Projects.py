@@ -90,6 +90,16 @@ for proj in projects:
         )
         st.markdown(tech_html, unsafe_allow_html=True)
 
+        # JD Alignment
+        if "jd_alignment" in proj:
+            st.markdown(
+                f'<div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">'
+                f'<span style="background: linear-gradient(90deg, #4ade80, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; font-size: 0.8rem;">🎯 SIE JD ALIGNMENT:</span>'
+                f'<span style="color: #e0e0ff; font-weight: 600; font-size: 0.85rem; border-bottom: 1px dashed #4ade80;">{proj["jd_alignment"]}</span>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
         # Description
         st.markdown(f'<p style="color: #c0c0e0; font-size: 0.9rem; line-height: 1.6; margin: 0.8rem 0;">{proj["description"]}</p>', unsafe_allow_html=True)
 
