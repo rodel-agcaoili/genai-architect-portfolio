@@ -5,6 +5,7 @@ import google.generativeai as genai
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.rag_engine import GEMINI_AVAILABLE, query_rag, generate_response
+from utils.voice_engine import get_voice_config, synthesize_speech, render_audio_player, render_voice_badge
 
 st.set_page_config(page_title="Ask Rodel — AI Chat", page_icon="💬", layout="wide")
 
@@ -32,6 +33,13 @@ if not api_key:
 if not GEMINI_AVAILABLE:
     st.error("`google-generativeai` not installed. Run: `pip install google-generativeai`")
     st.stop()
+
+# Voice configuration
+voice_config = get_voice_config()
+
+# Initialize voice toggle in session state
+if "voice_enabled" not in st.session_state:
+    st.session_state.voice_enabled = True
 
 # Init chat history
 if "chat_messages" not in st.session_state:
@@ -67,6 +75,13 @@ if hasattr(st.session_state, "_pq"):
                 resp = generate_response(q, ctx, api_key, st.session_state.chat_messages[:-1])
             st.markdown(resp)
             st.session_state.chat_messages.append({"role": "assistant", "content": resp})
+
+            # Voice response
+            if st.session_state.voice_enabled:
+                with st.spinner("🎙️ Generating voice..."):
+                    voice_result = synthesize_speech(resp)
+                render_audio_player(voice_result)
+
             st.rerun()
         except Exception as e:
             st.error(f"Something went wrong while generating a response. Check the Debug info below.")
@@ -89,6 +104,13 @@ if prompt := st.chat_input("Ask about my experience, projects, or skills..."):
                 resp = generate_response(prompt, ctx, api_key, st.session_state.chat_messages[:-1])
             st.markdown(resp)
             st.session_state.chat_messages.append({"role": "assistant", "content": resp})
+
+            # Voice response
+            if st.session_state.voice_enabled:
+                with st.spinner("🎙️ Generating voice..."):
+                    voice_result = synthesize_speech(resp)
+                render_audio_player(voice_result)
+
         except Exception as e:
             st.error(f"Something went wrong while generating a response. Check the Debug info below.")
             with st.expander("🛠️ Debug Info", expanded=True):
@@ -100,7 +122,23 @@ if prompt := st.chat_input("Ask about my experience, projects, or skills..."):
 with st.sidebar:
     st.markdown("### About This Chat")
     st.markdown("Powered by **Gemini 1.5 Pro** + **FAISS** vector search. Grounded in Rodel's profile data and 5 project READMEs. Never fabricates or exaggerates.")
-    
+
+    st.divider()
+
+    # Voice Controls
+    st.markdown("### 🎙️ Voice Mode")
+    render_voice_badge(voice_config)
+    st.session_state.voice_enabled = st.toggle(
+        "Enable Voice Responses",
+        value=st.session_state.voice_enabled,
+        key="voice_toggle",
+    )
+
+    if voice_config["tier"] == 3:
+        st.caption("💡 Add `ELEVENLABS_API_KEY` to secrets for premium AI voice.")
+
+    st.divider()
+
     with st.expander("🛠️ Environment Debug", expanded=False):
         st.markdown("### Available Models")
         try:
@@ -108,8 +146,7 @@ with st.sidebar:
             st.write(models)
         except Exception as me:
             st.write(f"Could not list models: {me}")
-            
+
     if st.button("🗑️ Clear Chat"):
         st.session_state.chat_messages = [{"role": "assistant", "content": "Chat cleared! What would you like to know?"}]
         st.rerun()
-
