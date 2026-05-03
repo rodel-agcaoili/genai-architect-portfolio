@@ -190,7 +190,6 @@ def render_audio_player(result: Dict[str, Any]) -> None:
             unsafe_allow_html=True,
         )
     else:
-        # Browser TTS fallback — use Web Speech API with natural voice selection
         safe_text = (
             result["text"]
             .replace("\\", "\\\\")
@@ -199,7 +198,15 @@ def render_audio_player(result: Dict[str, Any]) -> None:
             .replace("\n", " ")
             .replace("\r", "")
         )
-        # Do not truncate the text, read the full response
+        
+        # Fix common acronym pronunciation issues before TTS
+        import re
+        safe_text = re.sub(r'\bAWS\b', 'A. W. S.', safe_text)
+        safe_text = re.sub(r'\bAPI\b', 'A. P. I.', safe_text)
+        safe_text = re.sub(r'\bAI\b', 'A. I.', safe_text)
+        safe_text = re.sub(r'\bRAG\b', 'R. A. G.', safe_text)
+        safe_text = re.sub(r'\bLLM\b', 'L. L. M.', safe_text)
+        
         st.components.v1.html(
             f"""
             <script>
@@ -210,15 +217,17 @@ def render_audio_player(result: Dict[str, Any]) -> None:
                     utterance.pitch = 1.0;
                     utterance.volume = 1.0;
 
-                    // Select a natural-sounding male voice
+                    // Select a strictly male voice
                     const voices = window.speechSynthesis.getVoices();
                     const preferredNames = [
-                        'Google US English',        // Chrome — sometimes defaults to male/neutral
-                        'Microsoft Mark Online',    // Edge — male
-                        'Microsoft David',          // Windows — male
-                        'Daniel',                   // macOS — male (British)
-                        'Aaron',                    // macOS — male (US)
-                        'Alex',                     // macOS — male (US, classic)
+                        'Google UK English Male',   // Chrome — Male
+                        'Microsoft Mark',           // Edge/Windows — Male
+                        'Microsoft David',          // Windows — Male
+                        'Daniel',                   // macOS — Male (British)
+                        'Fred',                     // macOS — Male
+                        'Ralph',                    // macOS — Male
+                        'Aaron',                    // macOS — Male
+                        'Alex',                     // macOS — Male (classic)
                     ];
                     let selectedVoice = null;
                     for (const name of preferredNames) {{
