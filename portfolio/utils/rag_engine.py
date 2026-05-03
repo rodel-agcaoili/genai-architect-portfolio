@@ -141,7 +141,7 @@ def _get_embeddings(texts, api_key):
     for text in texts:
         try:
             result = genai.embed_content(
-                model="models/gemini-embedding-001",
+                model="models/text-embedding-004",
                 content=text,
                 task_type="retrieval_document"
             )
@@ -156,7 +156,7 @@ def _get_query_embedding(text, api_key):
     """Get a single query embedding."""
     genai.configure(api_key=api_key)
     result = genai.embed_content(
-        model="models/gemini-embedding-001",
+        model="models/text-embedding-004",
         content=text,
         task_type="retrieval_query"
     )
