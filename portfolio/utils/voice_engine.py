@@ -199,30 +199,26 @@ def render_audio_player(result: Dict[str, Any]) -> None:
             .replace("\n", " ")
             .replace("\r", "")
         )
-        # Truncate to avoid overly long speech
-        if len(safe_text) > 500:
-            safe_text = safe_text[:500] + "... For more detail, please read the full response above."
-
+        # Do not truncate the text, read the full response
         st.components.v1.html(
             f"""
             <script>
                 function speakText() {{
                     window.speechSynthesis.cancel();
                     const utterance = new SpeechSynthesisUtterance('{safe_text}');
-                    utterance.rate = 0.95;
+                    utterance.rate = 1.15; // Faster, conversational pace
                     utterance.pitch = 1.0;
                     utterance.volume = 1.0;
 
-                    // Select the most natural-sounding voice available
+                    // Select a natural-sounding male voice
                     const voices = window.speechSynthesis.getVoices();
                     const preferredNames = [
-                        'Google US English',        // Chrome — very natural
-                        'Microsoft Mark Online',    // Edge — natural
-                        'Samantha',                 // macOS — good quality
-                        'Daniel',                   // macOS — good quality
-                        'Karen',                    // macOS — decent
-                        'Aaron',                    // macOS
-                        'Alex',                     // macOS legacy
+                        'Google US English',        // Chrome — sometimes defaults to male/neutral
+                        'Microsoft Mark Online',    // Edge — male
+                        'Microsoft David',          // Windows — male
+                        'Daniel',                   // macOS — male (British)
+                        'Aaron',                    // macOS — male (US)
+                        'Alex',                     // macOS — male (US, classic)
                     ];
                     let selectedVoice = null;
                     for (const name of preferredNames) {{
