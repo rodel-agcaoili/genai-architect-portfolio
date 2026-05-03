@@ -286,10 +286,10 @@ Respond as Rodel Agcaoili following the system instructions."""
             if "429" in str(e) or "quota" in error_str or "rate" in error_str or "not found" in error_str:
                 continue
             # Non-quota error — return immediately
-            return f"I'm having trouble connecting right now. Please try again in a moment."
+            return f"I'm having trouble connecting right now. Please try again in a moment. (Error: {str(e)})"
 
     # All models exhausted
-    return "I'm experiencing high demand right now. Please try again in about 30 seconds."
+    return f"I'm experiencing high demand right now. Please try again in about 30 seconds. (API Error: {str(last_error)})"
 
 
 
