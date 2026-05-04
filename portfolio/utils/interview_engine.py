@@ -198,8 +198,9 @@ def get_best_answer(
     jd_text: str,
     question_type: str,
     api_key: str,
+    user_answer: Optional[str] = None,
 ) -> str:
-    """Generate an expert-level ideal answer for the given interview question."""
+    """Generate an expert-level ideal answer and a polished version of the user's answer."""
     framework_hint = ""
     if question_type == "Behavioral":
         framework_hint = "\nUse the STAR framework (Situation, Task, Action, Result). Label each section clearly."
@@ -208,6 +209,34 @@ def get_best_answer(
     elif question_type == "Leadership":
         framework_hint = "\nDemonstrate strategic thinking, stakeholder management, and team empowerment."
 
+    user_context = ""
+    instructions = """Provide the IDEAL answer a top candidate would give. This should be:
+- Specific and detailed (not vague or generic)
+- Demonstrate deep expertise relevant to the JD
+- Show real-world experience (use realistic examples)
+- Be the kind of answer that would get a "strong hire" signal
+""" + framework_hint + """
+
+After the ideal answer, add a section titled "💡 WHY THIS ANSWER WORKS:" explaining what makes this answer effective.
+"""
+
+    if user_answer and user_answer.strip():
+        user_context = f"\nCANDIDATE'S ORIGINAL ANSWER:\n{user_answer}\n"
+        instructions = """You must provide TWO versions of the answer:
+
+### 🌟 1. The Perfect Example
+Provide a generalized, top-tier ideal answer to this question. Demonstrate deep expertise and use realistic examples.
+""" + framework_hint + """
+
+### 🛠️ 2. Your Answer, Polished
+Take the CANDIDATE'S ORIGINAL ANSWER and rewrite it to be a top-tier "strong hire" response. 
+Keep their core scenario, context, and points, but improve the delivery, technical depth, and structure.
+Make them sound like an absolute expert while staying true to their original story.
+
+### 💡 Why These Work
+Briefly explain what makes these answers effective.
+"""
+
     prompt = f"""You are a career coach helping a candidate prepare for a top-tier interview.
 
 JOB DESCRIPTION CONTEXT:
@@ -215,17 +244,8 @@ JOB DESCRIPTION CONTEXT:
 
 INTERVIEW QUESTION ({question_type}):
 {question}
-
-Provide the IDEAL answer a top candidate would give. This should be:
-- Specific and detailed (not vague or generic)
-- Demonstrate deep expertise relevant to the JD
-- Show real-world experience (use realistic examples)
-- Be the kind of answer that would get a "strong hire" signal
-{framework_hint}
-
-After the ideal answer, add a section titled "💡 WHY THIS ANSWER WORKS:" explaining what makes this answer effective and what interview signals it sends.
-
-Keep it to 200-300 words for the answer itself.
+{user_context}
+{instructions}
 """
     return _call_gemini(prompt, api_key, temperature=0.5)
 

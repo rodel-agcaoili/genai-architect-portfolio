@@ -468,18 +468,30 @@ elif st.session_state.iv_phase == "interview":
                             st.markdown(f"- [{r.get('title', 'Link')}]({r.get('url', '#')}) ({rtype})")
 
                     with st.expander("📖 See Ideal Answer"):
-                        ideal = get_best_answer(q["question"], st.session_state.iv_jd, qtype, api_key)
+                        ideal = get_best_answer(q["question"], st.session_state.iv_jd, qtype, api_key, user_answer=answer_text)
                         st.markdown(ideal)
 
-                    # Advance button
-                    if current_q + 1 < total_q:
-                        if st.button("➡️ Next Question", key=f"next_{current_q}", type="primary"):
-                            st.session_state.iv_current_q += 1
+                    # Advance buttons
+                    adv_cols = st.columns(2)
+                    with adv_cols[0]:
+                        if st.button("🔄 Try Again", key=f"retry_{current_q}", use_container_width=True):
+                            if str(current_q) in st.session_state.iv_answers:
+                                del st.session_state.iv_answers[str(current_q)]
+                            if str(current_q) in st.session_state.iv_evaluations:
+                                del st.session_state.iv_evaluations[str(current_q)]
+                            if str(current_q) in st.session_state.iv_answer_times:
+                                del st.session_state.iv_answer_times[str(current_q)]
                             st.rerun()
-                    else:
-                        if st.button("📊 See Final Report", key="final_report", type="primary"):
-                            st.session_state.iv_phase = "report"
-                            st.rerun()
+                    
+                    with adv_cols[1]:
+                        if current_q + 1 < total_q:
+                            if st.button("➡️ Next Question", key=f"next_{current_q}", type="primary", use_container_width=True):
+                                st.session_state.iv_current_q += 1
+                                st.rerun()
+                        else:
+                            if st.button("📊 See Final Report", key="final_report", type="primary", use_container_width=True):
+                                st.session_state.iv_phase = "report"
+                                st.rerun()
 
                 except Exception as e:
                     st.error(f"Evaluation error: {e}")
