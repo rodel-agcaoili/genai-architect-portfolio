@@ -332,6 +332,15 @@ def _init_db():
             report_text TEXT
         )
     """)
+    
+    # Check for new columns to support session resumption
+    c.execute("PRAGMA table_info(sessions)")
+    columns = [row[1] for row in c.fetchall()]
+    if "status" not in columns:
+        c.execute("ALTER TABLE sessions ADD COLUMN status TEXT DEFAULT 'completed'")
+    if "session_state_json" not in columns:
+        c.execute("ALTER TABLE sessions ADD COLUMN session_state_json TEXT")
+        
     conn.commit()
     conn.close()
 
@@ -372,31 +381,111 @@ def save_session(session_data: Dict[str, Any], report_text: str) -> int:
 
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("""
-        INSERT INTO sessions (
-            timestamp, jd_title, jd_text, role_level, industry,
-            questions_count, answered_count, skipped_count, help_count,
-            overall_score, overall_grade, readiness,
-            evaluations_json, report_text
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        datetime.datetime.now().isoformat(),
-        jd_title,
-        jd_text,
-        session_data.get("role_level", ""),
-        session_data.get("industry", ""),
-        len(session_data.get("questions_asked", [])),
-        len(session_data.get("answers", {})),
-        session_data.get("skipped_count", 0),
-        session_data.get("help_count", 0),
-        overall_score,
-        overall_grade,
-        readiness,
-        json.dumps(evals),
-        report_text,
-    ))
+    
+    # Check if this session was previously saved as incomplete
+    session_id = session_data.get("session_id")
+    
+    if session_id:
+        c.execute("""
+            UPDATE sessions SET 
+                timestamp = ?, answered_count = ?, skipped_count = ?, help_count = ?,
+                overall_score = ?, overall_grade = ?, readiness = ?, evaluations_json = ?, 
+                report_text = ?, status = 'completed', session_state_json = ?
+            WHERE id = ?
+        """, (
+            datetime.datetime.now().isoformat(),
+            len(session_data.get("answers", {})),
+            session_data.get("skipped_count", 0),
+            session_data.get("help_count", 0),
+            overall_score,
+            overall_grade,
+            readiness,
+            json.dumps(evals),
+            report_text,
+            json.dumps(session_data.get("full_state", {})),
+            session_id
+        ))
+    else:
+        c.execute("""
+            INSERT INTO sessions (
+                timestamp, jd_title, jd_text, role_level, industry,
+                questions_count, answered_count, skipped_count, help_count,
+                overall_score, overall_grade, readiness,
+                evaluations_json, report_text, status, session_state_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?)
+        """, (
+            datetime.datetime.now().isoformat(),
+            jd_title,
+            jd_text,
+            session_data.get("role_level", ""),
+            session_data.get("industry", ""),
+            len(session_data.get("questions_asked", [])),
+            len(session_data.get("answers", {})),
+            session_data.get("skipped_count", 0),
+            session_data.get("help_count", 0),
+            overall_score,
+            overall_grade,
+            readiness,
+            json.dumps(evals),
+            report_text,
+            json.dumps(session_data.get("full_state", {}))
+        ))
+        session_id = c.lastrowid
+        
     conn.commit()
-    session_id = c.lastrowid
+    conn.close()
+    return session_id
+
+
+def save_incomplete_session(session_data: Dict[str, Any], full_state: Dict[str, Any]) -> int:
+    """Save an incomplete session mid-interview to allow resuming later."""
+    _init_db()
+    
+    jd_text = session_data.get("jd_text", "")
+    jd_title = jd_text.split("\n")[0][:80] if jd_text else "Untitled"
+    session_id = session_data.get("session_id")
+    
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    if session_id:
+        c.execute("""
+            UPDATE sessions SET 
+                timestamp = ?, answered_count = ?, skipped_count = ?, help_count = ?,
+                evaluations_json = ?, session_state_json = ?
+            WHERE id = ?
+        """, (
+            datetime.datetime.now().isoformat(),
+            len(session_data.get("answers", {})),
+            session_data.get("skipped_count", 0),
+            session_data.get("help_count", 0),
+            json.dumps(session_data.get("evaluations", {})),
+            json.dumps(full_state),
+            session_id
+        ))
+    else:
+        c.execute("""
+            INSERT INTO sessions (
+                timestamp, jd_title, jd_text, role_level, industry,
+                questions_count, answered_count, skipped_count, help_count,
+                status, session_state_json, evaluations_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'incomplete', ?, ?)
+        """, (
+            datetime.datetime.now().isoformat(),
+            jd_title,
+            jd_text,
+            session_data.get("role_level", ""),
+            session_data.get("industry", ""),
+            len(session_data.get("questions_asked", [])),
+            len(session_data.get("answers", {})),
+            session_data.get("skipped_count", 0),
+            session_data.get("help_count", 0),
+            json.dumps(full_state),
+            json.dumps(session_data.get("evaluations", {}))
+        ))
+        session_id = c.lastrowid
+        
+    conn.commit()
     conn.close()
     return session_id
 
@@ -429,3 +518,24 @@ def get_progress_summary() -> Dict[str, Any]:
         "improvement": scores[0] - scores[-1] if len(scores) > 1 else 0,
         "sessions": sessions,
     }
+
+
+def get_recent_jds(limit: int = 5) -> List[Dict[str, Any]]:
+    """Fetch the most recent unique Job Descriptions for quick resume/restart."""
+    _init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    # Get the latest session for each unique JD
+    c.execute("""
+        SELECT id, timestamp, jd_title, jd_text, status, role_level, industry, answered_count, questions_count, session_state_json
+        FROM sessions
+        GROUP BY jd_text
+        ORDER BY timestamp DESC
+        LIMIT ?
+    """, (limit,))
+    
+    rows = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return rows
