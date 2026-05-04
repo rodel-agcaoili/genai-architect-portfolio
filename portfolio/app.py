@@ -226,6 +226,43 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# -------------------------------------------------------------------------
+# RECRUITER GUIDED TOUR
+# -------------------------------------------------------------------------
+st.markdown("""
+<div style="background: linear-gradient(135deg, #1a1a3e, #2d2b6b); border: 1px solid #7c83ff; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+    <h3 style="color: #e0e0ff; margin-top: 0; display: flex; align-items: center; gap: 0.5rem;">
+        🧭 Recruiter Quick-Start Guide
+    </h3>
+    <p style="color: #c0c0e0; font-size: 0.95rem; line-height: 1.5;">
+        This portfolio is a live GenAI ecosystem. Depending on what you're hiring for, choose a pathway below to see 
+        live demonstrations of my engineering capabilities:
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+tour_cols = st.columns(3)
+
+with tour_cols[0]:
+    st.markdown("#### 🏗️ The Cloud Architect")
+    st.caption("Looking for someone who can build secure, scalable infrastructure?")
+    st.markdown("*Demonstrates: Infrastructure as Code, Automated Security Remediation, and Chaos Engineering.*")
+    st.page_link("pages/1_🚀_Projects.py", label="View the 5-Project Showcase", icon="🚀")
+
+with tour_cols[1]:
+    st.markdown("#### 💬 The AI Expert")
+    st.caption("Looking for deep expertise in LLMs, RAG, and conversational UX?")
+    st.markdown("*Demonstrates: Retrieval Augmented Generation (RAG) using my own career data as the knowledge base.*")
+    st.page_link("pages/2_💬_Ask_Rodel.py", label="Interview my AI Twin", icon="💬")
+
+with tour_cols[2]:
+    st.markdown("#### 🎯 The Product Builder")
+    st.caption("Looking for an engineer who ships complete, complex AI applications?")
+    st.markdown("*Demonstrates: Multi-turn prompt engineering, browser voice interaction, and SQLite persistence.*")
+    st.page_link("pages/4_🎯_Interview_Prep.py", label="See the Interview Coach", icon="🎯")
+
+st.markdown("<br>", unsafe_allow_html=True)
+
 # About Section
 st.markdown(f"""
 <div class="section-card">
