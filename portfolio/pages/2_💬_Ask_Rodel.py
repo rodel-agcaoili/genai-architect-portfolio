@@ -59,6 +59,8 @@ if not GEMINI_AVAILABLE:
 voice_config = get_voice_config()
 
 # Initialize session state
+if "voice_enabled" not in st.session_state:
+    st.session_state.voice_enabled = True
 if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = [{"role": "assistant", "content": "Hey! I'm Rodel's AI — built to answer your questions about his skills, projects, and experience. Everything I say is grounded in his actual docs. What would you like to know?"}]
 if "guest_name" not in st.session_state:
