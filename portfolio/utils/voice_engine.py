@@ -190,64 +190,80 @@ def render_audio_player(result: Dict[str, Any]) -> None:
             unsafe_allow_html=True,
         )
     else:
-        safe_text = (
-            result["text"]
-            .replace("\\", "\\\\")
-            .replace("'", "\\'")
-            .replace('"', '\\"')
-            .replace("\n", " ")
-            .replace("\r", "")
-        )
-        
-        # Fix common acronym pronunciation issues before TTS
-        import re
-        safe_text = re.sub(r'\bAWS\b', 'A. W. S.', safe_text)
-        safe_text = re.sub(r'\bAPI\b', 'A. P. I.', safe_text)
-        safe_text = re.sub(r'\bAI\b', 'A. I.', safe_text)
-        safe_text = re.sub(r'\bRAG\b', 'R. A. G.', safe_text)
-        safe_text = re.sub(r'\bLLM\b', 'L. L. M.', safe_text)
-        
-        st.components.v1.html(
-            f"""
-            <script>
-                function speakText() {{
-                    window.speechSynthesis.cancel();
-                    const utterance = new SpeechSynthesisUtterance('{safe_text}');
-                    utterance.rate = 1.15; // Faster, conversational pace
-                    utterance.pitch = 1.0;
-                    utterance.volume = 1.0;
+        render_browser_tts(result["text"])
 
-                    // Select a strictly male voice
-                    const voices = window.speechSynthesis.getVoices();
-                    const preferredNames = [
-                        'Google UK English Male',   // Chrome — Male
-                        'Microsoft Mark',           // Edge/Windows — Male
-                        'Microsoft David',          // Windows — Male
-                        'Daniel',                   // macOS — Male (British)
-                        'Fred',                     // macOS — Male
-                        'Ralph',                    // macOS — Male
-                        'Aaron',                    // macOS — Male
-                        'Alex',                     // macOS — Male (classic)
-                    ];
-                    let selectedVoice = null;
-                    for (const name of preferredNames) {{
-                        selectedVoice = voices.find(v => v.name.includes(name));
-                        if (selectedVoice) break;
-                    }}
-                    if (selectedVoice) utterance.voice = selectedVoice;
-                    window.speechSynthesis.speak(utterance);
-                }}
 
-                // Voices load asynchronously in Chrome — wait for them
-                if (window.speechSynthesis.getVoices().length > 0) {{
-                    speakText();
-                }} else {{
-                    window.speechSynthesis.onvoiceschanged = speakText;
+def render_browser_tts(text: str) -> None:
+    """
+    Speak text using the browser's built-in Web Speech API.
+    Reusable by any page — selects a male voice at conversational pace.
+    Fixes common tech acronym pronunciation.
+    """
+    import re
+    safe_text = (
+        text
+        .replace("\\", "\\\\")
+        .replace("'", "\\'")
+        .replace('"', '\\"')
+        .replace("\n", " ")
+        .replace("\r", "")
+    )
+
+    # Fix common acronym pronunciation issues
+    safe_text = re.sub(r'\bAWS\b', 'A. W. S.', safe_text)
+    safe_text = re.sub(r'\bAPI\b', 'A. P. I.', safe_text)
+    safe_text = re.sub(r'\bAI\b', 'A. I.', safe_text)
+    safe_text = re.sub(r'\bRAG\b', 'R. A. G.', safe_text)
+    safe_text = re.sub(r'\bLLM\b', 'L. L. M.', safe_text)
+    safe_text = re.sub(r'\bCI/CD\b', 'C. I. C. D.', safe_text)
+    safe_text = re.sub(r'\bIaC\b', 'Infrastructure as Code', safe_text)
+    safe_text = re.sub(r'\bK8s\b', 'Kubernetes', safe_text)
+    safe_text = re.sub(r'\bS3\b', 'S. 3.', safe_text)
+    safe_text = re.sub(r'\bEC2\b', 'E. C. 2.', safe_text)
+    safe_text = re.sub(r'\bVPC\b', 'V. P. C.', safe_text)
+    safe_text = re.sub(r'\bIAM\b', 'I. A. M.', safe_text)
+    safe_text = re.sub(r'\bSTAR\b', 'S. T. A. R.', safe_text)
+
+    st.components.v1.html(
+        f"""
+        <script>
+            function speakText() {{
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance('{safe_text}');
+                utterance.rate = 1.15;
+                utterance.pitch = 1.0;
+                utterance.volume = 1.0;
+
+                // Select a strictly male voice
+                const voices = window.speechSynthesis.getVoices();
+                const preferredNames = [
+                    'Google UK English Male',
+                    'Microsoft Mark',
+                    'Microsoft David',
+                    'Daniel',
+                    'Fred',
+                    'Ralph',
+                    'Aaron',
+                    'Alex',
+                ];
+                let selectedVoice = null;
+                for (const name of preferredNames) {{
+                    selectedVoice = voices.find(v => v.name.includes(name));
+                    if (selectedVoice) break;
                 }}
-            </script>
-            """,
-            height=0,
-        )
+                if (selectedVoice) utterance.voice = selectedVoice;
+                window.speechSynthesis.speak(utterance);
+            }}
+
+            if (window.speechSynthesis.getVoices().length > 0) {{
+                speakText();
+            }} else {{
+                window.speechSynthesis.onvoiceschanged = speakText;
+            }}
+        </script>
+        """,
+        height=0,
+    )
 
 
 def render_voice_badge(config: Dict[str, Any]) -> None:
