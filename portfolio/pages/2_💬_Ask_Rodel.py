@@ -38,6 +38,34 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ---------------------------------------------------------------------------
+# Guest Introduction Card
+# ---------------------------------------------------------------------------
+if not st.session_state.guest_name:
+    st.markdown("""
+    <div style="background: rgba(124, 131, 255, 0.1); border: 1px solid #7c83ff; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+        <h4 style="color: #e0e0ff; margin-top: 0;">👤 Welcome! Who am I speaking with?</h4>
+        <p style="color: #a0a0d0; font-size: 0.9rem;">I'd love to know who's visiting my portfolio! Feel free to introduce yourself below.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Use a column layout for the input to make it sleek
+    g_cols = st.columns([3, 1])
+    with g_cols[0]:
+        gname_input = st.text_input("Enter your Name and Company:", key="gname_top", placeholder="e.g. Jane Doe, Recruiter at Google")
+    with g_cols[1]:
+        st.markdown("<div style='margin-top: 1.8rem;'></div>", unsafe_allow_html=True)
+        if st.button("Confirm Identity", use_container_width=True, type="primary"):
+            if gname_input:
+                st.session_state.guest_name = gname_input
+                update_guest_name(gname_input)
+                st.toast(f"Thanks for visiting, {gname_input}!")
+                st.rerun()
+    st.divider()
+else:
+    st.success(f"📍 Currently chatting with: **{st.session_state.guest_name}**")
+    st.divider()
+
 # API Key — check secrets, env, then session
 api_key = None
 try:
@@ -70,15 +98,6 @@ if "guest_name" not in st.session_state:
 with st.sidebar:
     st.markdown("### ⚙️ Chat Settings")
     st.session_state.voice_enabled = st.toggle("Enable Voice Response", value=st.session_state.voice_enabled)
-    
-    st.divider()
-    st.markdown("### 👤 Your Identity")
-    gname = st.text_input("Introduce yourself (Name/Company):", value=st.session_state.guest_name or "", placeholder="Optional")
-    if gname != st.session_state.guest_name:
-        st.session_state.guest_name = gname
-        update_guest_name(gname)
-        if gname:
-            st.toast(f"Nice to meet you, {gname}!")
 
 # ---------------------------------------------------------------------------
 # Helper: generate response and handle voice (plays inline, ZERO reruns)
