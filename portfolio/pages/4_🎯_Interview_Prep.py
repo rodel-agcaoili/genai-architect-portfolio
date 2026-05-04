@@ -125,6 +125,7 @@ DEFAULTS = {
     "iv_answer_times": {},
     "iv_report": None,
     "iv_voice_on": True,
+    "iv_voice_speed": 1.15,
 }
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
@@ -150,6 +151,14 @@ def _type_emoji(qtype):
 with st.sidebar:
     st.markdown("### 🎯 Interview Coach")
     st.session_state.iv_voice_on = st.toggle("🔊 Interviewer Voice", value=st.session_state.iv_voice_on, key="iv_voice_toggle")
+    if st.session_state.iv_voice_on:
+        st.session_state.iv_voice_speed = st.slider(
+            "🗣️ Voice Speed",
+            min_value=0.5, max_value=2.0, value=st.session_state.iv_voice_speed, step=0.05,
+            format="%.2fx",
+            help="0.5 = slow, 1.0 = normal, 1.15 = conversational, 2.0 = fast",
+            key="iv_speed_slider",
+        )
 
     st.divider()
     progress = get_progress_summary()
@@ -260,7 +269,7 @@ elif st.session_state.iv_phase == "interview":
 
         # Speak the question
         if st.session_state.iv_voice_on and f"iv_spoken_{current_q}" not in st.session_state:
-            render_browser_tts(q["question"])
+            render_browser_tts(q["question"], rate=st.session_state.iv_voice_speed)
             st.session_state[f"iv_spoken_{current_q}"] = True
 
         # Answer input
@@ -381,7 +390,7 @@ elif st.session_state.iv_phase == "interview":
                     st.markdown(ideal)
                     if st.session_state.iv_voice_on:
                         # Only read a short excerpt
-                        render_browser_tts(ideal[:400])
+                        render_browser_tts(ideal[:400], rate=st.session_state.iv_voice_speed)
                 except Exception as e:
                     st.error(f"Error: {e}")
 

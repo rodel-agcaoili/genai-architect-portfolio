@@ -193,11 +193,15 @@ def render_audio_player(result: Dict[str, Any]) -> None:
         render_browser_tts(result["text"])
 
 
-def render_browser_tts(text: str) -> None:
+def render_browser_tts(text: str, rate: float = 1.15) -> None:
     """
     Speak text using the browser's built-in Web Speech API.
     Reusable by any page — selects a male voice at conversational pace.
     Fixes common tech acronym pronunciation.
+    
+    Args:
+        text: The text to speak.
+        rate: Speech rate (0.5 = slow, 1.0 = normal, 1.5 = fast, 2.0 = very fast).
     """
     import re
     safe_text = (
@@ -230,7 +234,7 @@ def render_browser_tts(text: str) -> None:
             function speakText() {{
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance('{safe_text}');
-                utterance.rate = 1.15;
+                utterance.rate = {rate};
                 utterance.pitch = 1.0;
                 utterance.volume = 1.0;
 
