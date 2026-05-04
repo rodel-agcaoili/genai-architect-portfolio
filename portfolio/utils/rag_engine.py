@@ -115,6 +115,10 @@ def _json_to_text(data, label):
         for proj in data.get("projects_summary", []):
             parts.append(f"Project {proj.get('number', '')}: {proj.get('name', '')} — {proj.get('description', '')}")
 
+        for edu in data.get("education", []):
+            if not edu.get("degree", "").startswith("UPDATE"):
+                parts.append(f"Education: {edu.get('degree', '')} from {edu.get('school', '')} ({edu.get('year', '')})")
+
         return "\n".join(parts)
     return json.dumps(data, indent=2)
 
