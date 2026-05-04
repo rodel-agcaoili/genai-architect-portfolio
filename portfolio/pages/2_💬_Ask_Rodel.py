@@ -6,6 +6,10 @@ import google.generativeai as genai
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.rag_engine import GEMINI_AVAILABLE, query_rag, generate_response
 from utils.voice_engine import get_voice_config, synthesize_speech, render_audio_player, render_voice_badge
+from utils.analytics_engine import init_analytics_db, log_chat_interaction, get_chat_logs, get_visitor_summary, update_guest_name
+
+# Initialize analytics
+init_analytics_db()
 
 st.set_page_config(page_title="Ask Rodel — AI Chat", page_icon="💬", layout="wide")
 
@@ -55,10 +59,24 @@ if not GEMINI_AVAILABLE:
 voice_config = get_voice_config()
 
 # Initialize session state
-if "voice_enabled" not in st.session_state:
-    st.session_state.voice_enabled = True
 if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = [{"role": "assistant", "content": "Hey! I'm Rodel's AI — built to answer your questions about his skills, projects, and experience. Everything I say is grounded in his actual docs. What would you like to know?"}]
+if "guest_name" not in st.session_state:
+    st.session_state.guest_name = None
+
+# Sidebar controls
+with st.sidebar:
+    st.markdown("### ⚙️ Chat Settings")
+    st.session_state.voice_enabled = st.toggle("Enable Voice Response", value=st.session_state.voice_enabled)
+    
+    st.divider()
+    st.markdown("### 👤 Your Identity")
+    gname = st.text_input("Introduce yourself (Name/Company):", value=st.session_state.guest_name or "", placeholder="Optional")
+    if gname != st.session_state.guest_name:
+        st.session_state.guest_name = gname
+        update_guest_name(gname)
+        if gname:
+            st.toast(f"Nice to meet you, {gname}!")
 
 # ---------------------------------------------------------------------------
 # Helper: generate response and handle voice (plays inline, ZERO reruns)
@@ -71,8 +89,18 @@ def _handle_query(question):
                 ctx = query_rag(question, api_key, k=5)
             with st.spinner("Thinking..."):
                 resp = generate_response(question, ctx, api_key, st.session_state.chat_messages[:-1])
+            
+            # Check for off-topic tag
+            is_off_topic = 0
+            if "[OFF-TOPIC]" in resp:
+                is_off_topic = 1
+                resp = resp.replace("[OFF-TOPIC]", "").strip()
+
             st.markdown(resp)
             st.session_state.chat_messages.append({"role": "assistant", "content": resp})
+
+            # Log interaction
+            log_chat_interaction(question, resp, guest_name=st.session_state.guest_name, is_off_topic=is_off_topic)
 
             # Play voice inline — only for real responses, NOT errors
             is_error = resp.startswith("I'm having trouble")
@@ -214,11 +242,46 @@ if "voice_query" in voice_params:
         _handle_query(voice_query)
 
 # Text chat input (always available)
-if prompt := st.chat_input("Ask about my experience, projects, or skills..."):
+if prompt := st.chat_input("Ask Rodel anything..."):
     st.session_state.chat_messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
     _handle_query(prompt)
+
+# ---------------------------------------------------------------------------
+# ADMIN DASHBOARD (Bottom of page)
+# ---------------------------------------------------------------------------
+st.markdown("<br><br>", unsafe_allow_html=True)
+with st.expander("📊 Admin Analytics Login"):
+    admin_pass = st.text_input("Enter Admin Password:", type="password")
+    correct_pass = st.secrets.get("INTERVIEW_PASSWORD", "admin123")
+    
+    if admin_pass == correct_pass:
+        st.success("Access Granted")
+        
+        tab1, tab2 = st.tabs(["💬 Recent Interactions", "👤 Visitor Summary"])
+        
+        with tab1:
+            logs = get_chat_logs(limit=50)
+            if not logs:
+                st.info("No logs found yet.")
+            else:
+                for log in logs:
+                    tag = "🔴 [OFF-TOPIC]" if log['is_off_topic'] else "🟢"
+                    name = log['guest_name'] or "Anonymous"
+                    with st.container(border=True):
+                        st.markdown(f"**{log['timestamp']}** | {tag} **{name}**")
+                        st.markdown(f"**Q:** {log['question']}")
+                        st.markdown(f"**A:** {log['response']}")
+        
+        with tab2:
+            visitors = get_visitor_summary()
+            if not visitors:
+                st.info("No visitors tracked yet.")
+            else:
+                st.table(visitors)
+    elif admin_pass:
+        st.error("Incorrect password")
 
 # ---------------------------------------------------------------------------
 # Sidebar
