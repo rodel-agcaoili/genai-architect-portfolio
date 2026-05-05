@@ -197,36 +197,53 @@ def render_browser_tts(text: str, rate: float = 1.15) -> None:
     """
     Speak text using the browser's built-in Web Speech API.
     Reusable by any page — selects a male voice at conversational pace.
-    Fixes common tech acronym pronunciation.
-    
-    Args:
-        text: The text to speak.
-        rate: Speech rate (0.5 = slow, 1.0 = normal, 1.5 = fast, 2.0 = very fast).
+    Fixes common tech acronym pronunciation and strips markdown.
     """
     import re
+    
+    # 1. Strip Markdown and special characters before escaping for JS
+    clean_text = text
+    clean_text = re.sub(r'\*\*', '', clean_text)  # Strip bolding
+    clean_text = re.sub(r'__', '', clean_text)   # Strip underlining
+    clean_text = re.sub(r'#+\s', '', clean_text) # Strip headers
+    clean_text = re.sub(r'[`*_-]', '', clean_text) # Strip other markdown symbols
+    clean_text = clean_text.replace("\\", "")    # Strip backslashes
+
+    # 2. Escape for JavaScript string literal
     safe_text = (
-        text
-        .replace("\\", "\\\\")
+        clean_text
         .replace("'", "\\'")
         .replace('"', '\\"')
         .replace("\n", " ")
         .replace("\r", "")
     )
 
-    # Fix common acronym pronunciation issues
-    safe_text = re.sub(r'\bAWS\b', 'A. W. S.', safe_text)
-    safe_text = re.sub(r'\bAPI\b', 'A. P. I.', safe_text)
-    safe_text = re.sub(r'\bAI\b', 'A. I.', safe_text)
-    safe_text = re.sub(r'\bRAG\b', 'R. A. G.', safe_text)
-    safe_text = re.sub(r'\bLLM\b', 'L. L. M.', safe_text)
-    safe_text = re.sub(r'\bCI/CD\b', 'C. I. C. D.', safe_text)
-    safe_text = re.sub(r'\bIaC\b', 'Infrastructure as Code', safe_text)
-    safe_text = re.sub(r'\bK8s\b', 'Kubernetes', safe_text)
-    safe_text = re.sub(r'\bS3\b', 'S. 3.', safe_text)
-    safe_text = re.sub(r'\bEC2\b', 'E. C. 2.', safe_text)
-    safe_text = re.sub(r'\bVPC\b', 'V. P. C.', safe_text)
-    safe_text = re.sub(r'\bIAM\b', 'I. A. M.', safe_text)
-    safe_text = re.sub(r'\bSTAR\b', 'S. T. A. R.', safe_text)
+    # 3. Phonetic normalization for tech acronyms (including plurals)
+    replacements = {
+        r'\bAWS\b': 'A. W. S.',
+        r'\bAPIs\b': 'A. P. Is',
+        r'\bAPI\b': 'A. P. I.',
+        r'\bPIIs\b': 'P. I. Is',
+        r'\bPII\b': 'P. I. I.',
+        r'\bAI\b': 'A. I.',
+        r'\bRAGs\b': 'R. A. Gs',
+        r'\bRAG\b': 'R. A. G.',
+        r'\bLLMs\b': 'L. L. Ms',
+        r'\bLLM\b': 'L. L. M.',
+        r'\bCI/CD\b': 'C. I. C. D.',
+        r'\bIaC\b': 'Infrastructure as Code',
+        r'\bK8s\b': 'Kubernetes',
+        r'\bS3\b': 'S. 3.',
+        r'\bEC2\b': 'E. C. 2.',
+        r'\bVPC\b': 'V. P. C.',
+        r'\bIAM\b': 'I. A. M.',
+        r'\bSTAR\b': 'S. T. A. R.',
+        r'\bSRE\b': 'S. R. E.',
+        r'\bSREs\b': 'S. R. Es',
+    }
+    
+    for pattern, replacement in replacements.items():
+        safe_text = re.sub(pattern, replacement, safe_text)
 
     st.components.v1.html(
         f"""
