@@ -122,7 +122,8 @@ with st.sidebar:
             "2: SentinelAI",
             "3: Governance Shield",
             "4: Incident Responder",
-            "5: Drift Evaluator"
+            "5: Drift Evaluator",
+            "6: SecOps-MLOps"
         ],
         index=0
     )
@@ -140,11 +141,11 @@ if page == "Home":
     st.markdown("""
     <div class="main-header">
         <h1>GenAI Architect Central Command</h1>
-        <p>Unified Orchestrator for 5 AWS Generative AI Architecture Projects</p>
+        <p>Unified Orchestrator for 6 AWS Generative AI Architecture Projects</p>
     </div>
     """, unsafe_allow_html=True)
     
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
     
     projects = [
         ("1: Secure RAG", "Serverless FAISS Pipeline", "col1"),
@@ -152,9 +153,10 @@ if page == "Home":
         ("3: Governance Shield", "Defense-in-Depth PII Proxy", "col3"),
         ("4: Incident Responder", "LangGraph Multi-Agent", "col4"),
         ("5: Drift Evaluator", "LLM-as-a-Judge MLOps", "col5"),
+        ("6: SecOps-MLOps", "Real-Time Telemetry Store", "col6"),
     ]
     
-    for col, (title, desc, _) in zip([col1, col2, col3, col4, col5], projects):
+    for col, (title, desc, _) in zip([col1, col2, col3, col4, col5, col6], projects):
         with col:
             st.markdown(f"""
             <div class="metric-card">
@@ -810,3 +812,163 @@ elif page == "5: Drift Evaluator":
                     st.markdown('<div class="metric-card"><h3>Quality Gate</h3><div class="value status-block">REVIEW</div></div>', unsafe_allow_html=True)
             
             st.divider()
+
+# -------------------------------------------------------------------------
+# PAGE: PROJECT 6 — SECOPS-MLOPS
+# -------------------------------------------------------------------------
+elif page == "6: SecOps-MLOps":
+    st.markdown("""
+    <div class="main-header">
+        <h1>Project 6: SecOps-MLOps</h1>
+        <p>Real-Time Telemetry Feature Store & Semantic Search Pipeline</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    **Executive Summary:**  
+    This project bridges the gap between high-velocity security telemetry and machine learning by implementing a decoupled, real-time feature store architecture. By combining **Feast** backed by **Redis** for sub-millisecond serving, and **Qdrant** for semantic anomaly search, this pipeline eradicates training-serving skew while enabling automated, high-fidelity threat hunting at enterprise scale.
+    """)
+    
+    st.divider()
+
+    st.subheader("Architecture Topology")
+    st.markdown("""
+    ```text
+    [ Raw Security Logs ] (CloudTrail, VPC Flows, Okta)
+            │
+            ▼
+    ┌───────────────────────────────────┐
+    │  Stream Processing (PySpark/Flink)│
+    │  - Aggregations (time-windowed)   │
+    │  - Embeddings Generation          │
+    └─────────────────┬─────────────────┘
+                      │
+           ┌──────────┴──────────┐
+           ▼                     ▼
+    ┌──────────────┐      ┌──────────────┐
+    │ Feast Store  │      │ Vector DB    │
+    │ (Offline: S3)│      │ (Qdrant)     │
+    │ (Online:     │      │ - Semantic   │
+    │  Redis)      │      │   Search     │
+    └──────┬───────┘      └──────┬───────┘
+           │                     │
+           ▼                     ▼
+    ┌───────────────────────────────────┐
+    │         FastAPI Inference         │
+    │ - Threat Scoring Endpoint         │
+    │ - Anomaly Context Retrieval       │
+    └─────────────────┬─────────────────┘
+                      │
+                      ▼
+            [ SecOps Dashboard ]
+    ```
+    """)
+    
+    st.divider()
+
+    st.subheader("Implementation Details")
+    
+    tab1, tab2, tab3 = st.tabs(["Feast FeatureView", "FastAPI Serving", "Qdrant Vector Storage"])
+    
+    with tab1:
+        st.markdown("**Defining the Telemetry Feature View (`features.py`)**")
+        st.code("""
+from feast import Entity, FeatureView, Field, FileSource
+from feast.types import Int64, Float32
+from datetime import timedelta
+
+telemetry_source = FileSource(
+    path="data/aggregated_metrics.parquet",
+    timestamp_field="event_timestamp",
+    created_timestamp_column="created_timestamp"
+)
+
+source_ip = Entity(name="source_ip", join_keys=["source_ip"])
+
+telemetry_fv = FeatureView(
+    name="ip_telemetry_features",
+    entities=[source_ip],
+    ttl=timedelta(days=1),
+    schema=[
+        Field(name="failed_login_attempts_30m", dtype=Int64),
+        Field(name="outbound_bytes_transferred_1h", dtype=Int64),
+        Field(name="unique_iam_roles_assumed_5m", dtype=Int64),
+    ],
+    online=True,
+    source=telemetry_source,
+    tags={"domain": "security", "team": "secops"}
+)
+        """, language="python")
+
+    with tab2:
+        st.markdown("**Real-Time Threat Inference Endpoint (`main.py`)**")
+        st.code("""
+from fastapi import FastAPI, HTTPException
+from feast import FeatureStore
+
+app = FastAPI(title="SecOps Inference Service")
+store = FeatureStore(repo_path=".")
+
+@app.post("/predict_threat/{source_ip}")
+async def predict_threat(source_ip: str):
+    try:
+        feature_vector = store.get_online_features(
+            features=[
+                "ip_telemetry_features:failed_login_attempts_30m",
+                "ip_telemetry_features:outbound_bytes_transferred_1h",
+                "ip_telemetry_features:unique_iam_roles_assumed_5m"
+            ],
+            entity_rows=[{"source_ip": source_ip}]
+        ).to_dict()
+
+        risk_score = 0.0
+        if feature_vector["ip_telemetry_features:failed_login_attempts_30m"][0] > 10:
+            risk_score += 0.6
+            
+        return {
+            "source_ip": source_ip,
+            "features": feature_vector,
+            "risk_score": min(risk_score, 1.0),
+            "status": "investigate" if risk_score > 0.7 else "benign"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+        """, language="python")
+
+    with tab3:
+        st.markdown("**Semantic Vector Search for Anomalies (`qdrant_client.py`)**")
+        st.code("""
+from qdrant_client import QdrantClient
+from qdrant_client.http.models import Distance, VectorParams, PointStruct
+from sentence_transformers import SentenceTransformer
+
+client = QdrantClient("localhost", port=6333)
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+client.recreate_collection(
+    collection_name="threat_intel_logs",
+    vectors_config=VectorParams(size=384, distance=Distance.COSINE)
+)
+
+def ingest_and_embed(log_text: str, log_id: int, metadata: dict):
+    vector = model.encode(log_text).tolist()
+    client.upsert(
+        collection_name="threat_intel_logs",
+        points=[
+            PointStruct(
+                id=log_id, 
+                vector=vector, 
+                payload={"raw_log": log_text, **metadata}
+            )
+        ]
+    )
+        """, language="python")
+
+    st.divider()
+
+    st.subheader("Source Code & Deployment")
+    st.markdown("The complete infrastructure-as-code, pipeline logic, and container configurations are available in my repository.")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.link_button("🔗 View Project on GitHub", "https://github.com/rodel-agcaoili/genai-architect-portfolio/tree/main/projects/06-secops-mlops", use_container_width=True)

@@ -241,7 +241,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-tour_cols = st.columns(3)
+tour_cols = st.columns(4)
 
 with tour_cols[0]:
     st.markdown("#### 🏗️ Cloud & Security")
@@ -260,6 +260,12 @@ with tour_cols[2]:
     st.caption("End-to-end applications built for professional development.")
     st.markdown("*Focus: Complex multi-agent logic, voice integration, and data persistence.*")
     st.page_link("pages/4_🎯_Interview_Prep.py", label="View AI Practice Engine", icon="🎯")
+
+with tour_cols[3]:
+    st.markdown("#### 🛡️ SecOps MLOps")
+    st.caption("Real-Time Telemetry Feature Store & Semantic Search Pipeline.")
+    st.markdown("*Focus: FastAPI, Feast, Qdrant Vector DB, Security Telemetry.*")
+    st.page_link("pages/5_🛡️_SecOps_MLOps.py", label="View Data Pipeline Lab", icon="🛡️")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
