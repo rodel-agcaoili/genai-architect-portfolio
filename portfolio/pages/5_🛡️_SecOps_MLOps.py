@@ -14,37 +14,27 @@ def render_secops_mlops_page():
 
     # 2. Architectural Flow Diagram
     st.subheader("Architecture Topology")
-    st.markdown("""
-    ```text
-    [ Raw Security Logs ] (CloudTrail, VPC Flows, Okta)
-            │
-            ▼
-    ┌───────────────────────────────────┐
-    │  Stream Processing (PySpark/Flink)│
-    │  - Aggregations (time-windowed)   │
-    │  - Embeddings Generation          │
-    └─────────────────┬─────────────────┘
-                      │
-           ┌──────────┴──────────┐
-           ▼                     ▼
-    ┌──────────────┐      ┌──────────────┐
-    │ Feast Store  │      │ Vector DB    │
-    │ (Offline: S3)│      │ (Qdrant)     │
-    │ (Online:     │      │ - Semantic   │
-    │  Redis)      │      │   Search     │
-    └──────┬───────┘      └──────┬───────┘
-           │                     │
-           ▼                     ▼
-    ┌───────────────────────────────────┐
-    │         FastAPI Inference         │
-    │ - Threat Scoring Endpoint         │
-    │ - Anomaly Context Retrieval       │
-    └─────────────────┬─────────────────┘
-                      │
-                      ▼
-            [ SecOps Dashboard ]
-    ```
-    """)
+    import streamlit.components.v1 as components
+    components.html("""
+        <div class="mermaid" style="display: flex; justify-content: center; width: 100%; margin-top: 20px;">
+            graph TD
+                A[Raw Security Logs<br/>CloudTrail, VPC Flows] -->|Streaming| B(PySpark/Flink Processing)
+                B -->|Aggregated Metrics| C[(Feast Store<br/>Redis + S3)]
+                B -->|Embeddings| D[(Qdrant Vector DB)]
+                
+                C -->|Feature Vector| E{FastAPI Inference}
+                D -->|Semantic Context| E
+                E -->|Threat Score| F[SecOps Dashboard]
+                
+                classDef default fill:#111128,stroke:#7c83ff,stroke-width:2px,color:#e0e0ff;
+                classDef db fill:#302b63,stroke:#7c83ff,stroke-width:2px,color:#fff;
+                class C,D db;
+        </div>
+        <script type="module">
+            import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+            mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+        </script>
+    """, height=380)
     
     st.divider()
 
