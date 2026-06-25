@@ -87,10 +87,10 @@ class QdrantService:
         print(f"Generating embeddings for {len(mock_logs)} security logs...")
         points = []
         for item in mock_logs:
-            # 1. Generate the dense vector embedding from text
+            # Generate the dense vector embedding from text
             vector = self.model.encode(item["text"]).tolist()
 
-            # 2. Package it with metadata (Payload)
+            # Package it with metadata (Payload)
             points.append(
                 models.PointStruct(
                     id=item["id"],
@@ -104,13 +104,13 @@ class QdrantService:
                 )
             )
 
-        # 3. Upsert to Qdrant collection
+        # Upsert to Qdrant collection
         self.client.upsert(
             collection_name=COLLECTION_NAME,
             wait=True,
             points=points
         )
-        print("✅ Qdrant semantic database populated successfully!")
+        print("Qdrant semantic database populated successfully!")
 
     def semantic_search(self, query_text: str, severity_filter: str = None, limit: int = 3):
         """Converts query to vector and searches Qdrant with optional payload filter."""
