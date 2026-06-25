@@ -3,38 +3,42 @@ set -e
 
 echo "=== Initializing SecOps-MLOps Pipeline ==="
 
-# Create virtual environment if it doesn't exist
+# 1. Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
     echo "Creating Python virtual environment..."
     python3 -m venv venv
 fi
 
-# Activate virtual environment
+# 2. Activate virtual environment
 echo "Activating virtual environment..."
 source venv/bin/activate
 
-# Upgrade pip and install dependencies
+# 3. Upgrade pip and install dependencies
 echo "Installing python dependencies..."
 pip install --upgrade pip
-pip install fastapi uvicorn "feast[redis]" qdrant-client pandas pyarrow sentence-transformers
+pip install fastapi uvicorn "feast[redis]" qdrant-client pandas pyarrow sentence-transformers scikit-learn joblib
 
-# Generate mock telemetry data
+# 4. Generate mock telemetry data
 echo "Generating mock telemetry data..."
 python data/generate_mock_data.py
 
-# Start Docker containers (Redis and Qdrant)
+# 5. Start Docker containers (Redis and Qdrant)
 echo "Starting Redis and Qdrant Docker containers..."
 docker-compose up -d
 
-# Wait for Redis to be fully healthy
+# 6. Wait for Redis to be fully healthy
 echo "Waiting for Redis to become healthy..."
 sleep 5
 
-# Apply Feast definitions to generate registry
+# 7. Apply Feast definitions to generate registry
 echo "Applying Feast feature store registry..."
 feast apply
 
-# Materialize data from Parquet (Offline) to Redis (Online)
+# 8. Train the ML model on the Feast offline features
+echo "Training ML Model (Isolation Forest Anomaly Detector)..."
+python train.py
+
+# 9. Materialize data from Parquet (Offline) to Redis (Online)
 CURRENT_TIME=$(date -u +"%Y-%m-%dT%H:%M:%S")
 echo "Materializing telemetry features to Redis online store up to $CURRENT_TIME..."
 feast materialize 2026-06-01T00:00:00 "$CURRENT_TIME"
