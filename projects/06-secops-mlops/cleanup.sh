@@ -3,7 +3,7 @@ echo "=== Cleaning Up SecOps-MLOps Pipeline ==="
 
 # 1. Stop and remove Docker containers (Redis & Qdrant)
 echo "Stopping Docker containers..."
-docker-compose down
+docker compose down
 
 # 2. Deactivate virtual environment if active (handles cases where script is sourced)
 if [[ "$VIRTUAL_ENV" != "" ]]; then

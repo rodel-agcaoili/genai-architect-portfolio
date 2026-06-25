@@ -24,7 +24,7 @@ python data/generate_mock_data.py
 
 # 5. Start Docker containers (Redis and Qdrant)
 echo "Starting Redis and Qdrant Docker containers..."
-docker-compose up -d
+docker compose up -d
 
 # 6. Wait for Redis & Qdrant to be fully healthy
 echo "Waiting for backend services to become healthy..."
