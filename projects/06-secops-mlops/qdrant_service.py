@@ -1,18 +1,44 @@
 import os
+import hashlib
 from datetime import datetime
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
-from fastembed import TextEmbedding
 
 COLLECTION_NAME = "security_logs"
+
+
+def get_text_embedding(text: str, dimensions: int = 384) -> list[float]:
+    """
+    A lightweight Feature Hashing Vectorizer (Hash Trick).
+    Maps text to a 384-dimensional space using MD5 hashes of words.
+    Provides fast, dependency-free text matching via Qdrant Cosine similarity.
+    """
+    vector = [0.0] * dimensions
+    # Simple clean tokenization
+    words = text.lower().replace(",", " ").replace(".", " ").replace("'", "").split()
+    if not words:
+        return vector
+
+    for word in words:
+        # Generate MD5 hash of the word
+        h = hashlib.md5(word.encode('utf-8')).hexdigest()
+        val = int(h, 16)
+        index = val % dimensions
+        # Alternate signs to reduce collision bias
+        sign = 1 if (val % 2 == 0) else -1
+        vector[index] += sign
+
+    # Normalize to L2 unit vector for Cosine similarity
+    norm = sum(x**2 for x in vector) ** 0.5
+    if norm > 0:
+        vector = [x / norm for x in vector]
+    return vector
 
 
 class QdrantService:
     def __init__(self, host="localhost", port=6333):
         # Establish connection to the Qdrant container
         self.client = QdrantClient(host=host, port=port)
-        # Initialize fastembed TextEmbedding (uses ONNX runtime, NO PyTorch/torch dependency)
-        self.model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
     def init_collection(self):
         """Initializes the security log collection if it does not exist."""
@@ -28,7 +54,7 @@ class QdrantService:
             self.client.create_collection(
                 collection_name=COLLECTION_NAME,
                 vectors_config=models.VectorParams(
-                    size=384,  # all-MiniLM-L6-v2 yields 384-dimensional dense vectors
+                    size=384,  # Matching our 384-dimensional Feature Hashing vector space
                     distance=models.Distance.COSINE
                 )
             )
@@ -84,15 +110,11 @@ class QdrantService:
             },
         ]
 
-        print(f"Generating embeddings for {len(mock_logs)} security logs using fastembed...")
-        
-        # fastembed.embed takes an iterable and returns a generator of numpy arrays
-        texts = [item["text"] for item in mock_logs]
-        embeddings = list(self.model.embed(texts))
-
+        print(f"Generating embeddings for {len(mock_logs)} security logs using local Feature Hashing...")
         points = []
-        for i, item in enumerate(mock_logs):
-            vector = embeddings[i].tolist()
+        for item in mock_logs:
+            # Generate the vector hash
+            vector = get_text_embedding(item["text"])
             points.append(
                 models.PointStruct(
                     id=item["id"],
@@ -116,8 +138,8 @@ class QdrantService:
 
     def semantic_search(self, query_text: str, severity_filter: str = None, limit: int = 3):
         """Converts query to vector and searches Qdrant with optional payload filter."""
-        # Convert input query to vector using fastembed
-        query_vector = list(self.model.embed([query_text]))[0].tolist()
+        # Convert input query to vector using local Feature Hashing
+        query_vector = get_text_embedding(query_text)
 
         # Build payload filter condition if requested
         query_filter = None
