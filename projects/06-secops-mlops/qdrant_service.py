@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 
 COLLECTION_NAME = "security_logs"
 
@@ -11,8 +11,8 @@ class QdrantService:
     def __init__(self, host="localhost", port=6333):
         # Establish connection to the Qdrant container
         self.client = QdrantClient(host=host, port=port)
-        # Initialize the lightweight embedding model
-        self.model = SentenceTransformer("all-MiniLM-L6-v2")
+        # Initialize fastembed TextEmbedding (uses ONNX runtime, NO PyTorch/torch dependency)
+        self.model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
     def init_collection(self):
         """Initializes the security log collection if it does not exist."""
@@ -84,13 +84,15 @@ class QdrantService:
             },
         ]
 
-        print(f"Generating embeddings for {len(mock_logs)} security logs...")
-        points = []
-        for item in mock_logs:
-            # Generate the dense vector embedding from text
-            vector = self.model.encode(item["text"]).tolist()
+        print(f"Generating embeddings for {len(mock_logs)} security logs using fastembed...")
+        
+        # fastembed.embed takes an iterable and returns a generator of numpy arrays
+        texts = [item["text"] for item in mock_logs]
+        embeddings = list(self.model.embed(texts))
 
-            # Package it with metadata (Payload)
+        points = []
+        for i, item in enumerate(mock_logs):
+            vector = embeddings[i].tolist()
             points.append(
                 models.PointStruct(
                     id=item["id"],
@@ -110,12 +112,12 @@ class QdrantService:
             wait=True,
             points=points
         )
-        print("Qdrant semantic database populated successfully!")
+        print("✅ Qdrant semantic database populated successfully!")
 
     def semantic_search(self, query_text: str, severity_filter: str = None, limit: int = 3):
         """Converts query to vector and searches Qdrant with optional payload filter."""
-        # Convert input query to vector
-        query_vector = self.model.encode(query_text).tolist()
+        # Convert input query to vector using fastembed
+        query_vector = list(self.model.embed([query_text]))[0].tolist()
 
         # Build payload filter condition if requested
         query_filter = None

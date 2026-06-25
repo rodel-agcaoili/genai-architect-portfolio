@@ -16,7 +16,7 @@ source venv/bin/activate
 # 3. Upgrade pip and install dependencies
 echo "Installing python dependencies..."
 pip install --upgrade pip
-pip install fastapi uvicorn "feast[redis]" qdrant-client pandas pyarrow sentence-transformers scikit-learn joblib
+pip install fastapi uvicorn "feast[redis]" qdrant-client pandas pyarrow fastembed scikit-learn joblib
 
 # 4. Generate mock telemetry data
 echo "Generating mock telemetry data..."
