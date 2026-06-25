@@ -110,10 +110,24 @@ def _synthesize_with_elevenlabs(
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=15)
         if response.status_code == 200:
+            st.session_state["voice_last_error"] = None
             return response.content
+        
         # Log the failure reason for debugging
+        try:
+            err_json = response.json()
+            err_detail = err_json.get("detail", {}).get("message", response.text)
+        except Exception:
+            err_detail = response.text
+        
+        error_msg = f"ElevenLabs API error {response.status_code}: {err_detail}"
+        st.session_state["voice_last_error"] = error_msg
+        print(f"[Voice Engine] {error_msg}")
         return None
-    except requests.RequestException:
+    except requests.RequestException as e:
+        error_msg = f"ElevenLabs network error: {str(e)}"
+        st.session_state["voice_last_error"] = error_msg
+        print(f"[Voice Engine] {error_msg}")
         return None
 
 
@@ -140,6 +154,7 @@ def synthesize_speech(text: str) -> Dict[str, Any]:
             text, config["api_key"], config["voice_id"]
         )
         if audio_bytes:
+            st.session_state["voice_active_tier"] = 1
             return {
                 "audio": audio_bytes,
                 "tier": 1,
@@ -156,6 +171,7 @@ def synthesize_speech(text: str) -> Dict[str, Any]:
             text, config["api_key"], config["voice_id"]
         )
         if audio_bytes:
+            st.session_state["voice_active_tier"] = 2
             return {
                 "audio": audio_bytes,
                 "tier": 2,
@@ -164,6 +180,7 @@ def synthesize_speech(text: str) -> Dict[str, Any]:
             }
 
     # Tier 3: Browser TTS (ultimate fallback)
+    st.session_state["voice_active_tier"] = 3
     return {
         "audio": None,
         "tier": 3,
@@ -289,7 +306,9 @@ def render_browser_tts(text: str, rate: float = 1.15) -> None:
 
 def render_voice_badge(config: Dict[str, Any]) -> None:
     """Render a small badge in the sidebar showing the current voice mode."""
-    tier = config["tier"]
+    # Use the last active tier if available, otherwise default to config tier
+    tier = st.session_state.get("voice_active_tier", config["tier"])
+    
     if tier == 1:
         color = "#4ade80"
         desc = "Cloned Voice Active"
@@ -307,3 +326,13 @@ def render_voice_badge(config: Dict[str, Any]) -> None:
         f'</div>',
         unsafe_allow_html=True,
     )
+
+    # Show debugging error if there's any ElevenLabs failure logged
+    last_error = st.session_state.get("voice_last_error")
+    if last_error:
+        st.markdown(
+            f'<div style="color: #f87171; font-size: 0.75rem; line-height: 1.2; margin-top: 0.2rem; word-break: break-word;">'
+            f'⚠️ {last_error}'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
