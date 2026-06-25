@@ -990,8 +990,13 @@ elif page == "6: SecOps-MLOps":
             if is_live:
                 try:
                     response = requests.post(f"{BACKEND_URL}/predict_threat/{target_ip}", timeout=2.0)
-                    data = response.json()
-                    inference_type = data.get("inference_type", "Live ML Model")
+                    if response.status_code == 200:
+                        data = response.json()
+                        inference_type = data.get("inference_type", "Live ML Model")
+                    else:
+                        st.error(f"Backend API error ({response.status_code}). Falling back to simulation.")
+                        data = MOCK_TELEMETRY.get(target_ip)
+                        inference_type = "Fallback Simulation (API Error)"
                 except Exception as e:
                     st.error(f"Failed to query backend: {e}")
                     data = MOCK_TELEMETRY.get(target_ip)
@@ -1035,8 +1040,13 @@ elif page == "6: SecOps-MLOps":
                     if sev_filter != "All":
                         params["severity"] = sev_filter
                     response = requests.get(f"{BACKEND_URL}/search_logs", params=params, timeout=2.0)
-                    results = response.json()
-                    search_mode = "Live Qdrant Cluster"
+                    if response.status_code == 200:
+                        results = response.json()
+                        search_mode = "Live Qdrant Cluster"
+                    else:
+                        st.error(f"Search API error ({response.status_code}). Falling back to simulation.")
+                        results = simulate_search(search_query, sev_filter)
+                        search_mode = "Fallback Simulation (API Error)"
                 except Exception as e:
                     st.error(f"Search failed: {e}")
                     results = simulate_search(search_query, sev_filter)
