@@ -95,10 +95,7 @@ if not GEMINI_AVAILABLE:
 voice_config = get_voice_config()
 
 
-# Sidebar controls
-with st.sidebar:
-    st.markdown("### ⚙️ Chat Settings")
-    st.session_state.voice_enabled = st.toggle("Enable Voice Response", value=st.session_state.voice_enabled)
+
 
 # ---------------------------------------------------------------------------
 # Helper: generate response and handle voice (plays inline, ZERO reruns)

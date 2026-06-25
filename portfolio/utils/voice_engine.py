@@ -84,6 +84,54 @@ def get_voice_config() -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Helper: Text Cleaning and Truncation
+# ---------------------------------------------------------------------------
+def clean_and_truncate_text(text: str, max_chars: int = 250) -> str:
+    """
+    Clean markdown, list symbols, and link syntax from text, and truncate it
+    to the first few natural sentences up to max_chars to prevent timeouts,
+    conserve ElevenLabs character quota, and keep speech concise.
+    """
+    import re
+    # Remove markdown bold/italic
+    text = re.sub(r"\*+", "", text)
+    # Remove markdown headers
+    text = re.sub(r"#+\s+", "", text)
+    # Remove link formatting [text](url) -> text
+    text = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", text)
+    # Replace bullet points or numbering at start of lines
+    text = re.sub(r"^\s*[-*+]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*\d+\.\s+", "", text, flags=re.MULTILINE)
+    # Collapse multiple spaces/newlines into a single space
+    text = re.sub(r"\s+", " ", text).strip()
+    
+    if len(text) <= max_chars:
+        return text
+
+    # Try to truncate at sentence boundaries (period, exclamation, question mark followed by space)
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    truncated = ""
+    for s in sentences:
+        if len(truncated) + len(s) + (1 if truncated else 0) <= max_chars:
+            truncated = f"{truncated} {s}".strip() if truncated else s
+        else:
+            # If nothing fits, take a hard slice
+            if not truncated:
+                truncated = s[:max_chars].strip()
+            break
+            
+    # Add a polite trailing indicator if truncated
+    if len(truncated) < len(text):
+        if not truncated.endswith('.'):
+            truncated = truncated.rstrip('.,!?;:') + "..."
+        else:
+            truncated = truncated[:-1] + "..."
+        truncated += " (Full response shown below.)"
+        
+    return truncated
+
+
+# ---------------------------------------------------------------------------
 # ElevenLabs TTS
 # ---------------------------------------------------------------------------
 def _synthesize_with_elevenlabs(
@@ -146,12 +194,15 @@ def synthesize_speech(text: str) -> Dict[str, Any]:
             - label (str): Human-readable label for the voice mode
             - text (str): Original text (needed for browser TTS fallback)
     """
+    # 1. Clean and truncate the text first
+    cleaned_text = clean_and_truncate_text(text)
+    
     config = get_voice_config()
 
     # Tier 1: Cloned voice
     if config["tier"] == 1:
         audio_bytes = _synthesize_with_elevenlabs(
-            text, config["api_key"], config["voice_id"]
+            cleaned_text, config["api_key"], config["voice_id"]
         )
         if audio_bytes:
             st.session_state["voice_active_tier"] = 1
@@ -159,16 +210,16 @@ def synthesize_speech(text: str) -> Dict[str, Any]:
                 "audio": audio_bytes,
                 "tier": 1,
                 "label": config["label"],
-                "text": text,
+                "text": cleaned_text,
             }
-        # Tier 1 failed (quota?) → fall through to Tier 2
+        # Tier 1 failed (quota/timeout) → fall through to Tier 2
         config["tier"] = 2
         config["voice_id"] = DEFAULT_PREMADE_VOICE_ID
 
     # Tier 2: Pre-made ElevenLabs voice
     if config["tier"] == 2:
         audio_bytes = _synthesize_with_elevenlabs(
-            text, config["api_key"], config["voice_id"]
+            cleaned_text, config["api_key"], config["voice_id"]
         )
         if audio_bytes:
             st.session_state["voice_active_tier"] = 2
@@ -176,7 +227,7 @@ def synthesize_speech(text: str) -> Dict[str, Any]:
                 "audio": audio_bytes,
                 "tier": 2,
                 "label": "🔊 AI Voice" if config["tier"] == 2 else "🔊 AI Voice (Fallback)",
-                "text": text,
+                "text": cleaned_text,
             }
 
     # Tier 3: Browser TTS (ultimate fallback)
@@ -185,7 +236,7 @@ def synthesize_speech(text: str) -> Dict[str, Any]:
         "audio": None,
         "tier": 3,
         "label": "🔊 Browser Voice",
-        "text": text,
+        "text": cleaned_text,
     }
 
 
@@ -276,23 +327,37 @@ def render_browser_tts(text: str, rate: float = 1.15) -> None:
                 const voices = window.speechSynthesis.getVoices();
                 const preferredNames = [
                     'Google UK English Male',
+                    'Google US English Male',
+                    'Google AU English Male',
                     'Microsoft Mark',
                     'Microsoft David',
                     'Daniel',
+                    'Alex',
                     'Fred',
                     'Ralph',
-                    'Aaron',
-                    'Alex',
+                    'Aaron'
                 ];
                 let selectedVoice = null;
+                // 1. Try exact matches from preferred list (case-insensitive)
                 for (const name of preferredNames) {{
-                    selectedVoice = voices.find(v => v.name.includes(name));
+                    selectedVoice = voices.find(v => v.name.toLowerCase().includes(name.toLowerCase()));
                     if (selectedVoice) break;
+                }}
+                // 2. Fallback: Search for any voice with 'male' in the name (case-insensitive)
+                if (!selectedVoice) {{
+                    selectedVoice = voices.find(v => v.name.toLowerCase().includes('male'));
+                }}
+                // 3. Fallback: Search for other known male voices by language
+                if (!selectedVoice) {{
+                    const fallbackMaleNames = ['mikhail', 'rishi', 'jorge', 'thomas', 'nicolas'];
+                    for (const name of fallbackMaleNames) {{
+                        selectedVoice = voices.find(v => v.name.toLowerCase().includes(name));
+                        if (selectedVoice) break;
+                    }}
                 }}
                 if (selectedVoice) utterance.voice = selectedVoice;
                 window.speechSynthesis.speak(utterance);
             }}
-
             if (window.speechSynthesis.getVoices().length > 0) {{
                 speakText();
             }} else {{
